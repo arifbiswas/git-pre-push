@@ -277,3 +277,4 @@ module.exports = {
   printRemoteScanReport,
   resolveGitHubToken
 };
+

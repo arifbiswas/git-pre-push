@@ -40,3 +40,4 @@ describe('Remote Scanner URL Parser', () => {
     assert.strictEqual(parseGitHubUrl('invalid-url-without-slash'), null);
   });
 });
+
