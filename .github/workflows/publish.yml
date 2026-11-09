@@ -1,0 +1,59 @@
+name: Auto Version Bump & NPM Publish
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Test, Bump Version & Publish
+    runs-on: ubuntu-latest
+    # Prevent infinite loop on automated release commit
+    if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, 'chore(release):')"
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js (with npm registry)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Run Test Suite
+        run: npm test
+
+      - name: Configure Git Bot
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Check NPM_TOKEN Secret
+        run: |
+          if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
+            echo "::error::NPM_TOKEN secret is not set in GitHub repository settings!"
+            echo "Please add your npm Access Token to GitHub Settings -> Secrets and variables -> Actions -> NPM_TOKEN"
+            exit 1
+          fi
+
+      - name: Bump Version (Patch)
+        run: |
+          npm version patch -m "chore(release): bump version to %s [skip ci]"
+
+      - name: Push Version Tag to GitHub
+        run: |
+          git push --follow-tags
+
+      - name: Publish to NPM Registry
+        run: |
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
