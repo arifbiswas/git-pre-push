@@ -42,15 +42,38 @@ npm install -D @arifbiswas/git-pre-push
 
 ---
 
-### Option 2: Instant Setup via npx (Zero Installation)
+### Option 2: Instant Interactive Menu via npx
 
-In any Git repository, run:
+Run without arguments to open the interactive selection dashboard:
 
 ```bash
-npx @arifbiswas/git-pre-push init
+npx @arifbiswas/git-pre-push
 ```
 
-Your repository is immediately protected.
+Or if installed globally (`npm i -g @arifbiswas/git-pre-push`):
+```bash
+gitsafty
+```
+
+```text
+================================================================
+       🛡️  GitSafty: Pre-Push Malware & Secret Guard        
+================================================================
+
+Select an action to perform:
+
+  [1] 🛡️  Install Local Hook       - Protect current repository
+  [2] 🌐  Install Global Hook      - Lock down ALL git repos across this PC
+  [3] 🔍  Scan Local Workspace    - Audit staged & untracked files for threats
+  [4] 🚀  Scan Remote GitHub Repo - Zero-clone audit (no download/clone)
+  [5] 🧹  Clean & Quarantine      - Remove temp_*_push.bat & trojan scripts
+  [6] ⚡  Run Push Intercept Demo - Simulate a blocked malware push
+  [7] 🤖  Setup GitHub Action CI  - Guard repository on GitHub server-side
+  [8] ❌  Uninstall Hook          - Remove pre-push hook
+  [0] 🚪  Exit
+
+Enter your choice (1-8, 0 to exit):
+```
 
 ---
 
