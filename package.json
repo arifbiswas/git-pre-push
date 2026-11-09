@@ -1,0 +1,36 @@
+{
+  "name": "git-safty",
+  "version": "1.0.0",
+  "description": "Zero-dependency pre-push security guard that stops malware, injected scripts, and leaked secrets from reaching GitHub.",
+  "main": "src/index.js",
+  "bin": {
+    "git-safty": "./bin/cli.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "scripts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "init": "node bin/cli.js init",
+    "scan": "node bin/cli.js scan",
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "keywords": [
+    "git-hook",
+    "security",
+    "pre-push",
+    "malware-detection",
+    "infostealer-blocker",
+    "secret-leak",
+    "gitguard"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "author": "",
+  "license": "MIT"
+}
