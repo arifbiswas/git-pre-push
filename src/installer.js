@@ -12,6 +12,14 @@ function generateHookContent() {
 
 run_scanner() {
   # 1. Try local node_modules
+  if [ -f "./node_modules/@arifbiswas/git-pre-push/bin/cli.js" ]; then
+    node "./node_modules/@arifbiswas/git-pre-push/bin/cli.js" scan-push "$@"
+    return $?
+  fi
+  if [ -f "./node_modules/git-pre-push/bin/cli.js" ]; then
+    node "./node_modules/git-pre-push/bin/cli.js" scan-push "$@"
+    return $?
+  fi
   if [ -f "./node_modules/git-safty/bin/cli.js" ]; then
     node "./node_modules/git-safty/bin/cli.js" scan-push "$@"
     return $?
@@ -23,19 +31,27 @@ run_scanner() {
     return $?
   fi
 
-  # 3. Try npx
-  if command -v npx >/dev/null 2>&1; then
-    npx --no-install git-safty scan-push "$@"
+  # 3. Try global commands if in PATH
+  if command -v git-pre-push >/dev/null 2>&1; then
+    git-pre-push scan-push "$@"
     return $?
   fi
-
-  # 4. Try global command
   if command -v git-safty >/dev/null 2>&1; then
     git-safty scan-push "$@"
     return $?
   fi
 
-  # 5. Shell Fallback Guard (if Node is not available in current subshell)
+  # 4. Try bunx or npx with published package @arifbiswas/git-pre-push
+  if command -v bunx >/dev/null 2>&1; then
+    bunx --yes @arifbiswas/git-pre-push scan-push "$@" 2>/dev/null
+    if [ $? -eq 0 ]; then return 0; fi
+  fi
+  if command -v npx >/dev/null 2>&1; then
+    npx --yes @arifbiswas/git-pre-push scan-push "$@" 2>/dev/null
+    if [ $? -eq 0 ]; then return 0; fi
+  fi
+
+  # 5. Shell Fallback Guard (if Node/package is not available in current subshell)
   echo "[GitSafty Fallback] Scanning push payload..."
   ZERO_OID="0000000000000000000000000000000000000000"
   SUSPICIOUS_FILES="temp_auto_push\\.bat|temp_interactive_push\\.bat|config\\.bat|autorun\\.bat|hidden_push\\.sh|.*\\.exe$|.*\\.vbs$|.*\\.ps1$|.*\\.scr$"
