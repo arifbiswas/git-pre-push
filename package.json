@@ -18,7 +18,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node --test test/*.test.js",
+    "test": "node --test",
     "init": "node bin/cli.js init",
     "scan": "node bin/cli.js scan",
     "postinstall": "node scripts/postinstall.js"
