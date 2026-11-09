@@ -1,0 +1,22 @@
+name: 'Git Pre-Push Security Guard'
+description: 'Zero-dependency security scanner that prevents malware, trojans, IDE backdoors, and leaked secrets from entering your repository.'
+author: 'Arif Biswas'
+
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  strict:
+    description: 'Treat warnings as critical errors'
+    required: false
+    default: 'false'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run Git-Pre-Push Security Audit
+      shell: bash
+      run: |
+        node ${{ github.action_path }}/bin/cli.js scan
+
