@@ -78,23 +78,37 @@ ${HOOK_END_MARKER}
 }
 
 /**
- * Installs pre-push hook into git repository
+ * Installs pre-push hook into git repository or globally
  * @param {string} [cwd] 
+ * @param {boolean} [isGlobal=false]
  * @returns {{ success: boolean, message: string }}
  */
-function installHook(cwd = process.cwd()) {
-  if (!isGitRepo(cwd)) {
-    return {
-      success: false,
-      message: 'Not a git repository. Run "git init" first.'
-    };
+function installHook(cwd = process.cwd(), isGlobal = false) {
+  let hooksDir;
+
+  if (isGlobal) {
+    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+    hooksDir = path.join(homeDir, '.git-hooks-safty');
+    if (!fs.existsSync(hooksDir)) {
+      fs.mkdirSync(hooksDir, { recursive: true });
+    }
+    // Set global core.hooksPath
+    const { runGit } = require('./utils/git');
+    runGit(`config --global core.hooksPath "${hooksDir}"`);
+  } else {
+    if (!isGitRepo(cwd)) {
+      return {
+        success: false,
+        message: 'Not a git repository. Run "git init" first or use --global.'
+      };
+    }
+    hooksDir = getHooksDir(cwd);
   }
 
-  const hooksDir = getHooksDir(cwd);
   if (!hooksDir) {
     return {
       success: false,
-      message: 'Could not resolve .git/hooks directory.'
+      message: 'Could not resolve git hooks directory.'
     };
   }
 
@@ -108,13 +122,14 @@ function installHook(cwd = process.cwd()) {
 
     let finalContent = '';
     if (fs.existsSync(hookPath)) {
+      // Make writable if previously locked
+      try { fs.chmodSync(hookPath, 0o755); } catch (_) {}
+
       const existing = fs.readFileSync(hookPath, 'utf8');
       if (existing.includes(HOOK_MARKER)) {
-        // Replace existing block
         const regex = new RegExp(`${HOOK_MARKER}[\\s\\S]*?${HOOK_END_MARKER}`, 'm');
         finalContent = existing.replace(regex, newHookBlock.trim());
       } else {
-        // Append to existing hook
         finalContent = existing.trim() + '\n\n' + newHookBlock;
       }
     } else {
@@ -122,14 +137,15 @@ function installHook(cwd = process.cwd()) {
     }
 
     fs.writeFileSync(hookPath, finalContent, { mode: 0o755 });
-    // Explicitly chmod for Unix / macOS
     try {
+      // Executable permission
       fs.chmodSync(hookPath, 0o755);
     } catch (_) {}
 
+    const typeMsg = isGlobal ? 'GLOBAL Git hook for ALL repositories on this PC' : 'local pre-push hook';
     return {
       success: true,
-      message: `Successfully installed GitSafty pre-push hook at: ${hookPath}`
+      message: `Successfully installed GitSafty ${typeMsg} at: ${hookPath}`
     };
   } catch (err) {
     return {
