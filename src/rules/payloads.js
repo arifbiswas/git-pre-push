@@ -78,6 +78,12 @@ const PAYLOAD_SIGNATURES = [
     severity: 'CRITICAL',
     description: 'Direct interactive reverse shell socket invocation.'
   },
+  {
+    name: 'Python/Perl One-Liner Reverse Shell',
+    regex: /(python[23]?\s+-c\s+['"].*import\s+(socket|subprocess).*connect\(|perl\s+-e\s+['"].*use\s+Socket.*connect\()/i,
+    severity: 'CRITICAL',
+    description: 'One-liner Python/Perl interactive reverse shell payload.'
+  },
 
   // 6. Suspicious Exfiltration Endpoints in scripts
   {
@@ -97,6 +103,14 @@ const PAYLOAD_SIGNATURES = [
     regex: /https?:\/\/(webhook\.site|requestbin\.(com|net)|pipedream\.net|filebin\.net)\/[a-z0-9-]+/i,
     severity: 'WARNING',
     description: 'Temporary upload or webhook logging service detected.'
+  },
+
+  // 7. Malicious package lifecycle hooks
+  {
+    name: 'Suspicious Network Call in npm Script',
+    regex: /(preinstall|postinstall)\s*:\s*['"][^'"]*(curl|wget|powershell|certutil)\s+/i,
+    severity: 'CRITICAL',
+    description: 'npm lifecycle hook executing remote network downloads upon installation.'
   }
 ];
 
