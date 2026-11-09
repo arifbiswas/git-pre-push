@@ -1,156 +1,185 @@
 # 🛡️ git-pre-push (GitSafty)
 
-> **The Zero-Dependency Pre-Push Security Guard & Malware Blocker for Git.**  
-> Stops infostealers, injected Trojan scripts, IDE backdoors, and leaked credentials from ever reaching GitHub or poisoning your software supply chain.
+> **Zero-Dependency Pre-Push Security Guard & Infostealer Blocker for Git.**  
+> Intercepts `git push` in real-time to prevent malware, Trojan scripts, compromised IDE configs, and leaked credentials from ever reaching GitHub or poisoning your software supply chain.
 
-[![npm version](https://img.shields.io/badge/npm-v1.0.0-blue.svg)](https://www.npmjs.com/package/git-pre-push)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20(Pure%20Node.js)-brightgreen.svg)](#-zero-external-runtime-dependencies)
-[![Tests Passing](https://img.shields.io/badge/tests-15%2F15%20passing-success.svg)](#-test-coverage)
-
----
-
-## 📌 কেন আপনার এই প্যাকেজটি প্রয়োজন? (Why Do You Need This?)
-
-আজকাল ডেভেলপারদের পিসি প্রায়ই ইনফোস্টিলার (Infostealer) ম্যালওয়্যার দ্বারা আক্রান্ত হয়। পিসিতে একবার ম্যালওয়্যার ঢুকলে তা ব্যাকগ্রাউন্ডে বসে:
-1. আপনার কোডবেজে ক্ষতিকর স্ক্রিপ্ট ইনজেক্ট করে (যেমন: `temp_auto_push.bat`, `temp_interactive_push.bat`, `autorun.bat`, `*.ps1`, `*.vbs`)।
-2. `.vscode/tasks.json` বা `.vscode/settings.json` ফাইলে ব্যাকডোর তৈরি করে, যাতে অন্য কোনো ডেভেলপার বা আপনি প্রোজেক্ট ওপেন করলেই ম্যালওয়্যার অটো-রান হয়ে যায়।
-3. আপনার প্রোজেক্টের `.env` ফাইল বা প্রাইভেট এপিআই কী Discord Webhook বা Telegram Bot-এ পাচার করে।
-4. সবচেয়ে মারাত্মক বিষয়: আপনার পিসির সংরক্ষিত GitHub Credentials বা SSH Key ব্যবহার করে **অটোমেটিকভাবে GitHub-এ ম্যালওয়্যার পুশ করে দেয়!**
-5. এর ফলে আপনার পুরো টিম এবং ক্লায়েন্টদের সফটওয়্যার সাপ্লাই চেইন (Supply Chain) আক্রান্ত হয়ে পড়ে।
-
-**`git-pre-push` ঠিক এই আক্রমণের বিরুদ্ধেই প্রাচীর হিসেবে কাজ করে।**  
-ডেভেলপার টার্মিনাল, VS Code কিংবা যেকোনো Git GUI থেকে `git push` দিলে, কোড GitHub-এ যাওয়ার আগেই মিলিসেকেন্ডের মধ্যে আউটগোয়িং কোড ও ফাইল স্ক্যান করে ম্যালওয়্যার শনাক্ত হওয়া মাত্র **পুশ রিজেক্ট (Hard Block)** করে দেয়!
+[![npm version](https://img.shields.io/npm/v/@arifbiswas/git-pre-push.svg?style=flat-square)](https://www.npmjs.com/package/@arifbiswas/git-pre-push)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+[![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20(Pure%20Node.js)-brightgreen.svg?style=flat-square)](#-zero-external-runtime-dependencies)
+[![Tests Passing](https://img.shields.io/badge/tests-18%2F18%20passing-success.svg?style=flat-square)](#-test-coverage)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg?style=flat-square)](#-cross-platform--zero-dependencies)
 
 ---
 
-## 🚀 এক নজরে ইনস্টলেশন ও ব্যবহার (Quick Start)
+## 📌 Why Do You Need This?
 
-### ১. যেকোনো প্রজেক্টে অটোমেটিক সেটআপ (Recommended)
+Developer workstations are high-value targets for infostealer malware (RedLine, Lumma, Vidar, etc.) and supply-chain attacks. Once a machine is compromised, malware silently:
 
-আপনার প্রজেক্টে প্যাকেজটি ইনস্টল করুন:
+1. **Injects auto-commit/push scripts** into your Git repositories (e.g., `temp_auto_push.bat`, `temp_interactive_push.bat`, `autorun.bat`, `*.ps1`, `*.vbs`).
+2. **Backdoors your IDE configs** (e.g., `.vscode/tasks.json` with `runOn: "folderOpen"`) so that opening the project immediately triggers remote shell execution on any teammate's machine.
+3. **Exfiltrates secrets & `.env` files** to attacker-controlled Discord webhooks or Telegram bots.
+4. **Leverages stored Git credentials / SSH keys** to automatically push backdoored code straight to GitHub.
+5. **Poisons the Software Supply Chain**, affecting every teammate who pulls the code and every production build deployed from it.
+
+**`git-pre-push` stops this attack chain at the source.**  
+Whenever `git push` is invoked—from terminal, VS Code UI, or any Git GUI—it intercepts the push in milliseconds, inspects outgoing files and commit diffs, and **hard-blocks the push** if any malicious patterns are found.
+
+---
+
+## 🚀 Quick Start
+
+### Option 1: Automatic Setup via npm (Recommended)
+
+Add `git-pre-push` to your project:
 
 ```bash
-npm install -D git-pre-push
+npm install -D @arifbiswas/git-pre-push
 ```
 
-> **ম্যাজিক:** ইনস্টল হওয়ার সাথে সাথেই এর `postinstall` স্ক্রিপ্ট আপনার প্রজেক্টের `.git/hooks/pre-push` ফাইলটি স্বয়ংক্রিয়ভাবে তৈরি করে প্রোটেকশন চালু করে দেবে। আপনার আর কোনো ম্যানুয়াল কনফিগারেশন করতে হবে না!
+> **Zero Configuration Required:** The `postinstall` script automatically installs the `.git/hooks/pre-push` guard in your repository.
 
 ---
 
-### ২. কোনো কিছু ইনস্টল না করে সরাসরি চালানো (Zero Install via npx)
+### Option 2: Instant Setup via npx (Zero Installation)
 
-যেকোনো Git রিপোজিটরিতে ঢুকে টার্মিনালে রান করুন:
+In any Git repository, run:
 
 ```bash
-npx git-pre-push init
+npx @arifbiswas/git-pre-push init
 ```
 
-ব্যস! আপনার রিপোজিটরি সাথে সাথে সুরক্ষিত।
+Your repository is immediately protected.
 
 ---
 
-### ৩. আক্রান্ত পিসির সব প্রজেক্ট একসাথে লক করা (Global Protection)
+### Option 3: Lock Down an Entire Machine (Global Protection)
 
-আপনার পিসি যদি অলরেডি কোনো ম্যালওয়্যার দ্বারা আক্রান্ত হয়ে থাকে, তবে একটি কমান্ডেই পিসির সমস্ত গিট রিপোজিটরি সুরক্ষিত করুন:
+If you suspect your workstation has been compromised, lock down **all Git repositories on your computer** with a single command:
 
 ```bash
-npx git-pre-push init --global
+npx @arifbiswas/git-pre-push init --global
 ```
 
-এটি আপনার সিস্টেমের `git config --global core.hooksPath` সেট করে দেয়, ফলে আপনার পিসির **যেকোনো ফোল্ডার বা প্রজেক্ট** থেকে পুশ দিলে স্বয়ংক্রিয়ভাবে সিকিউরিটি গার্ড সক্রিয় থাকবে।
+This configures `git config --global core.hooksPath`, ensuring every repository on your PC runs the security scanner before any push.
 
 ---
 
-## ⚡ কীভাবে কাজ করে? (Architecture Flow)
+## ⚡ How It Works
 
 ```
-             ডেভেলপার বা ম্যালওয়্যার রান করলো: git push
-                                 │
-                                 ▼
-             Git ইন্টারসেপ্ট করবে: .git/hooks/pre-push
-                                 │
-                                 ▼
-               🛡️ GitSafty Scanner ইঞ্জিন (< 5ms)
-    ┌────────────────────────────────────────────────────────┐
-    │ 1. ফাইলনেম ব্লকলিস্ট চেক (temp_*_push.bat, .exe, .ps1)  │
-    │ 2. আউটগোয়িং কোড ডিফে ম্যালিসিয়াস পেলোড স্ক্যান       │
-    │ 3. .vscode ও .idea ব্যাকডোর কনফিগারেশন চেকিং           │
-    │ 4. লিক হওয়া গোপন তথ্য (.env, API Key, Private Key)    │
-    └────────────────────────────────────────────────────────┘
-                                 │
-          ┌──────────────────────┴──────────────────────┐
-          ▼                                             ▼
-    [ম্যালওয়্যার পাওয়া গেছে]                         [সব ক্লিন আছে]
-          │                                             │
-   ❌ PUSH REJECTED (Blocked)                    ✅ PUSH ALLOWED
-(GitHub-এ ক্ষতিকর কোড যেতে পারবে না)         (নিরাপদে GitHub-এ পুশ হবে)
+           Developer or Malware executes: git push
+                              │
+                              ▼
+           Git triggers: .git/hooks/pre-push
+                              │
+                              ▼
+            🛡️ GitSafty Scanner Engine (< 5ms)
+ ┌─────────────────────────────────────────────────────────┐
+ │ 1. Blacklist check (temp_*_push.bat, .exe, .ps1, .vbs)  │
+ │ 2. Outgoing commit diff inspection for payload cradles  │
+ │ 3. IDE backdoor inspection (.vscode/tasks.json, .idea)  │
+ │ 4. Credential & secret leak detection (.env, RSA keys)  │
+ └─────────────────────────────────────────────────────────┘
+                              │
+        ┌─────────────────────┴─────────────────────┐
+        ▼                                           ▼
+  [Threats Found]                             [Clean Scan]
+        │                                           │
+ ❌ PUSH REJECTED                            ✅ PUSH ALLOWED
+(Malware blocked locally)                   (Pushed cleanly to GitHub)
 ```
 
 ---
 
-## 🎯 আমরা কী কী সমস্যার সমাধান (Solutions) করেছি?
+## 🎯 Threat Detection Capabilities
 
-### ১. ইনজেক্টেড ব্যাচ ও ট্রোজান স্ক্রিপ্ট প্রতিরোধ
-- `temp_auto_push.bat`, `temp_interactive_push.bat`, `config.bat`, `autorun.bat`, `hidden_push.sh`
-- বিপজ্জনক এক্সটেনশন: `*.vbs`, `*.ps1`, `*.exe`, `*.scr`, `*.msi`, `*.dll`, `*.hta`
-- ছদ্মবেশী ডাবল এক্সটেনশন ব্লকিং (যেমন: `invoice.pdf.exe`)
+### 1. Injected Scripts & Trojan Filenames
+- Known malicious auto-push scripts: `temp_auto_push.bat`, `temp_interactive_push.bat`, `config.bat`, `autorun.bat`, `hidden_push.sh`
+- Blocked executable extensions: `*.exe`, `*.scr`, `*.msi`, `*.dll`, `*.vbs`, `*.ps1`, `*.hta`, `*.pif`, `*.cpl`
+- Deceptive double-extension tricks: `document.pdf.exe`, `invoice.xlsx.bat`
 
-### ২. অবফাসকেটেড ম্যালওয়্যার পেলোড ও রিভার্স শেল ডিটেকশন
-- PowerShell Encoded Commands: `powershell -enc ...`, `powershell -encodedcommand`
-- PowerShell Download Cradles: `DownloadString`, `Invoke-WebRequest`, `IEX`
-- রিমোট পাইপ এক্সিকিউশন: `curl ... | bash` বা `wget ... | sh`
-- ডায়নামিক কোড ইভালুয়েশন: `eval(base64_decode(...))`, `Buffer.from(..., 'base64')`
-- Windows LOLBins এক্সপ্লয়েট: `certutil -urlcache`, `bitsadmin /transfer`, `mshta`
-- সরাসরি সকেট রিভার্স শেল: `/bin/sh -i >& /dev/tcp/...`, `nc -e /bin/sh`
+### 2. Obfuscated Payloads & Reverse Shells
+- PowerShell obfuscated execution: `powershell -enc`, `powershell -encodedcommand`
+- Web download cradles: `Invoke-WebRequest`, `DownloadString`, `IEX`
+- Remote pipe-to-shell: `curl ... | bash`, `wget ... | sh`, `curl ... | python`
+- Dynamic base64 evaluation: `eval(base64_decode(...))`, `Buffer.from(..., 'base64')`
+- Windows LOLBins abuse: `certutil -urlcache`, `bitsadmin /transfer`, `mshta http`
+- TCP socket reverse shells: `/bin/sh -i >& /dev/tcp/...`, `nc -e /bin/sh`
 
-### ৩. IDE ব্যাকডোর ও অটো-রান টাস্ক প্রতিরোধ
-- `.vscode/tasks.json`-এ প্রোজেক্ট ওপেন হওয়ার সাথে সাথে অটো-রান ব্যাকডোর (`runOn: "folderOpen"`) শনাক্ত ও ব্লক।
-- `.vscode/settings.json`-এ টার্মিনাল এনভায়রনমেন্ট বা শেল হাইজ্যাকিং প্রতিরোধ।
-- JetBrains `.idea/` ফোল্ডারে লুকানো এক্সটার্নাল স্ক্রিপ্ট টাস্ক শনাক্তকরণ।
+### 3. IDE Configuration Backdoors
+- `.vscode/tasks.json`: Auto-executing shell tasks triggered on folder open (`runOn: "folderOpen"`)
+- `.vscode/settings.json`: Malicious terminal profile overrides or shell binary path hijacking
+- JetBrains `.idea/`: Suspicious external tool execution in `workspace.xml` or `tasks.xml`
 
-### ৪. ক্রেডেনশিয়াল চুরি ও ডেটা এক্সফিল্ট্রেশন রোধ
-- Discord Webhook টোকেন স্টিলার (`https://discord.com/api/webhooks/...`)
-- Telegram Bot API দিয়ে ডেটা চুরি
-- পাবলিক ড্রপার বা রিকোয়েস্ট লগার (`webhook.site`, `pipedream`, ইত্যাদি)
-- ভুলবশত প্রোডাকশন `.env` ফাইল কমিট হওয়া প্রতিরোধ
-- প্রাইভেট ক্রিপ্টোগ্রাফিক কী (`BEGIN RSA PRIVATE KEY`, `ghp_...`, AWS Access Keys)
-
-### ৫. অলরেডি আক্রান্ত পিসি ক্লিন করা (Auto-Quarantine & Fix)
-আক্রান্ত পিসিতে ম্যালওয়্যার যেসব ফাইল তৈরি করে রেখেছে, তা খুঁজতে হবে না। সরাসরি রান করুন:
-```bash
-npx git-pre-push clean
-```
-এটি সাথে সাথে রিপোজিটরির সব সংক্রামিত ফাইল শনাক্ত করে গিট ইনডেক্স থেকে আনস্টেজ করবে এবং নিরাপদ কোয়ারেন্টাইন ডিরেক্টরিতে (`.git/git-safty-quarantine/`) পাঠিয়ে দেবে।
-
-### ৬. Zero-Bypass CI Defense (GitHub Action)
-ম্যালওয়্যার যদি কখনো লোকাল হুক বাইপাস করার জন্য `git push --no-verify` কমান্ড ব্যবহার করে, তবে ক্লাউড লেভেলের সুরক্ষার জন্য রান করুন:
-```bash
-npx git-pre-push action
-```
-এটি রিপোজিটরিতে `.github/workflows/git-safty.yml` ফাইল তৈরি করে দেবে। ফলে কেউ লোকাল হুক এড়িয়ে পুশ দিলেও GitHub Actions-এ PR বা পুশ সাথে সাথে ফেইল হয়ে ব্লক হয়ে যাবে।
-
-### ৭. ক্লাউড ও রিমোট রিপোজিটরি স্ক্যানার (Cloud Scanner Engine)
-আমরা `server/` ডিরেক্টরিতে একটি সম্পূর্ণ লাইটওয়েট ক্লাউড স্ক্যানার ইঞ্জিন তৈরি করেছি যা GitHub Webhook বা GitHub REST API-এর মাধ্যমে রিমোট রিপোজিটরির ফুল ফাইল ট্রি স্ক্যান করতে পারে এবং ম্যালওয়্যার পাওয়া গেলে স্বয়ংক্রিয়ভাবে `git commit` দিয়ে ফাইল রিমুভ (Auto-Remediation) করতে পারে।
+### 4. Credential Exfiltration & Secret Leaks
+- Hardcoded Discord webhook dumps (`https://discord.com/api/webhooks/...`)
+- Telegram Bot token exfiltration endpoints
+- Temporary file drop & webhook logging services (`webhook.site`, `pipedream.net`, `filebin.net`)
+- Unencrypted production `.env` files being committed
+- Leaked cryptographic private keys (`BEGIN RSA PRIVATE KEY`, `ghp_...`, AWS Access Keys)
 
 ---
 
-## 🛠️ CLI কমান্ড রেফারেন্স (Command Reference)
+## 🛠️ CLI Command Reference
 
-| কমান্ড | বিবরণ |
+| Command | Description |
 |---|---|
-| `npx git-pre-push init` | বর্তমান রিপোজিটরিতে লোকাল `pre-push` সিকিউরিটি হুক ইনস্টল করে |
-| `npx git-pre-push init --global` | আক্রান্ত পিসির **সবগুলো** গিট প্রজেক্ট একসাথে এক কমান্ডে লক করে |
-| `npx git-pre-push scan` | বর্তমান ওয়ার্কস্পেস ও স্টেজড ফাইলে কোনো ম্যালওয়্যার আছে কিনা অডিট করে |
-| `npx git-pre-push clean` | ম্যালওয়্যারের ইনজেক্ট করা সব ফাইল কোয়ারেন্টাইনে পাঠিয়ে পিসি সুরক্ষিত করে |
-| `npx git-pre-push action` | সার্ভার-সাইড সুরক্ষার জন্য GitHub Actions CI ওয়ার্কফ্লো তৈরি করে |
-| `npx git-pre-push uninstall` | রিপোজিটরি থেকে হুকটি পরিষ্কারভাবে রিমুভ করে |
+| `npx @arifbiswas/git-pre-push init` | Installs the pre-push security hook into `.git/hooks/pre-push` |
+| `npx @arifbiswas/git-pre-push init --global` | Protects **all** Git repositories across the entire PC |
+| `npx @arifbiswas/git-pre-push scan` | Manually audits workspace files, untracked scripts & staged diffs |
+| `npx @arifbiswas/git-pre-push clean` | Unstages and quarantines injected malware files to `.git/git-safty-quarantine/` |
+| `npx @arifbiswas/git-pre-push action` | Generates a `.github/workflows/git-safty.yml` CI workflow |
+| `npx @arifbiswas/git-pre-push uninstall` | Cleanly removes the hook from `.git/hooks` |
 
 ---
 
-## ⚙️ কাস্টম কনফিগারেশন (Optional `.gitsafetyrc.json`)
+## 🧹 Quarantine & Remediation (`clean`)
 
-কোনো স্পেসিফিক ফাইল বা রুল ইগনোর করতে চাইলে রুট ফোল্ডারে `.gitsafetyrc.json` তৈরি করতে পারেন (বাই ডিফল্ট কোনো কনফিগারেশন ছাড়াই এটি সেরা পারফরম্যান্সে চলে):
+If malware has already generated files in your project, clean them up instantly:
+
+```bash
+npx @arifbiswas/git-pre-push clean
+```
+
+```
+================================================================
+       🛡️  GitSafty: Pre-Push Malware & Secret Guard        
+================================================================
+Scanning workspace for injected malware scripts to quarantine...
+
+⚠ Quarantined 2 malicious file(s):
+   ✖ temp_auto_push.bat
+   ✖ config.bat
+
+✔ Cleaned from staging area and moved to quarantine folder (.git/git-safty-quarantine/).
+```
+
+---
+
+## 🛡️ Defense-in-Depth: GitHub Actions CI Guard
+
+To guard against attackers attempting to bypass local hooks using `git push --no-verify`, install the GitHub Actions workflow:
+
+```bash
+npx @arifbiswas/git-pre-push action
+```
+
+This creates `.github/workflows/git-safty.yml`. Any pull request or push containing blacklisted scripts or suspicious payloads will fail CI on GitHub's servers automatically.
+
+---
+
+## ☁️ Cloud Scanner & Webhook Platform (`server/`)
+
+The repository includes a standalone cloud scanner microservice in `server/` that integrates with GitHub Apps and Webhooks:
+- **Webhook Endpoint (`POST /webhook`):** Verifies HMAC SHA-256 signatures and audits incoming pushes.
+- **REST Scan API (`POST /api/scan`):** Recursively fetches remote repository trees (`/git/trees/{sha}?recursive=1`) and inspects file blobs.
+- **Auto-Remediation:** Automatically creates remediation commits via GitHub REST API to isolate and remove compromised files.
+
+---
+
+## ⚙️ Optional Configuration (`.gitsafetyrc.json`)
+
+Works out-of-the-box with zero configuration. You can optionally customize behavior with a `.gitsafetyrc.json` file in your project root:
 
 ```json
 {
@@ -164,44 +193,46 @@ npx git-pre-push action
 
 ---
 
-## 💎 কেন `git-pre-push` অন্যান্য টুলস থেকে আলাদা?
+## 💎 Comparison: Why git-pre-push Stands Out
 
-| ফিচার | সাধারণ লিন্টার / হুক্স | git-pre-push |
+| Feature | Generic Git Hooks / Linters | git-pre-push |
 |---|:---:|:---:|
-| **Zero Runtime Dependencies** | ❌ (শতাধিক ডিপেনডেন্সি) | ✅ (১০০% পিওর Node.js built-ins) |
-| **সাপ্লাই চেইন রিস্ক** | ⚠️ রয়েছে | 🛡️ শূন্য (কোনো থার্ড পার্টি প্যাকেজ নেই) |
-| **এক্সিকিউশন টাইম** | 🐢 ১ - ৩ সেকেন্ড | ⚡ < ৫ মিলিসেকেন্ড |
-| **Infostealer ম্যালওয়্যার ব্লকিং** | ❌ নেই | ✅ ফুল ব্লকলিস্ট ও সিগনেচার ডিটেকশন |
-| **IDE ব্যাকডোর চেকার (.vscode)** | ❌ নেই | ✅ ইনবিল্ট স্বয়ংক্রিয় অ্যানালাইসিস |
-| **গ্লোবাল পিসি প্রোটেকশন (`--global`)** | ❌ নেই | ✅ এক কমান্ডেই পুরো পিসির সব প্রজেক্ট লক |
-| **ইনফেক্টেড ফাইল কোয়ারেন্টাইন (`clean`)** | ❌ নেই | ✅ স্বয়ংক্রিয়ভাবে ক্লিনআপ |
-| **শেল ফলব্যাক সাপোর্ট** | ❌ নেই | ✅ Node না থাকলেও শেল স্ক্রিপ্ট প্রটেক্ট করে |
+| **Runtime Dependencies** | ❌ 50+ packages (heavy) | ✅ **0 (Pure Node.js built-ins)** |
+| **Supply Chain Vulnerability** | ⚠️ High (dependency tree) | 🛡️ **Zero** (no external modules) |
+| **Execution Overhead** | 🐢 1 - 3 seconds | ⚡ **< 5 milliseconds** |
+| **Infostealer Malware Detection** | ❌ No | ✅ **Full signature & payload engine** |
+| **IDE Backdoor Detection (.vscode)** | ❌ No | ✅ **Built-in static analysis** |
+| **Global Machine Lockdown (`--global`)** | ❌ No | ✅ **One-command PC protection** |
+| **Auto-Quarantine Cleaner (`clean`)** | ❌ No | ✅ **Automatic remediation** |
+| **Shell Fallback Guard** | ❌ No | ✅ **Built-in POSIX shell fallback** |
 
 ---
 
-## 🧪 টেস্ট কভারেজ (Test Coverage)
+## 🧪 Test Coverage
 
-আমাদের টেস্ট স্যুট সম্পূর্ণ Node.js নেটিভ টেস্ট রানার দিয়ে পরিচালিত:
+Verified with Node.js native test runner across all supported platforms:
 
 ```bash
 npm test
 ```
 ```
+✔ Cloud Scanner Webhook Signature Verification (2 tests)
+✔ Cloud Scanner Remote Tree Audit (1 test)
 ✔ Filename & Extension Checks (4 tests)
 ✔ Payload Signatures Detection (5 tests)
 ✔ Secret & Credential Checks (3 tests)
 ✔ IDE Configuration Tampering (2 tests)
 ✔ Hook Installer and Uninstaller (1 test)
 
-ℹ tests 15 | pass 15 | fail 0 | duration_ms ~160ms
+ℹ tests 18 | pass 18 | fail 0 | duration_ms ~300ms
 ```
 
 ---
 
-## 📄 লাইসেন্স (License)
+## 📄 License
 
 MIT License © 2026
 
 ---
 
-**Made with 🛡️ to protect developers, teams, and the open-source software supply chain.**
+**Built with 🛡️ to safeguard developers, teams, and the global software supply chain.**
