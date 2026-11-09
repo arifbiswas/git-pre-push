@@ -3,10 +3,12 @@
 > **Zero-Dependency Pre-Push Security Guard & Infostealer Blocker for Git.**  
 > Intercepts `git push` in real-time to prevent malware, Trojan scripts, compromised IDE configs, and leaked credentials from ever reaching GitHub or poisoning your software supply chain.
 
+[![Release](https://img.shields.io/github/v/release/arifbiswas/git-pre-push?style=flat-square&color=blue)](https://github.com/arifbiswas/git-pre-push/releases)
+[![CI Test Suite](https://github.com/arifbiswas/git-pre-push/actions/workflows/ci.yml/badge.svg)](https://github.com/arifbiswas/git-pre-push/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/@arifbiswas/git-pre-push.svg?style=flat-square)](https://www.npmjs.com/package/@arifbiswas/git-pre-push)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20(Pure%20Node.js)-brightgreen.svg?style=flat-square)](#-zero-external-runtime-dependencies)
-[![Tests Passing](https://img.shields.io/badge/tests-18%2F18%20passing-success.svg?style=flat-square)](#-test-coverage)
+[![Tests Passing](https://img.shields.io/badge/tests-20%2F20%20passing-success.svg?style=flat-square)](#-test-coverage)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg?style=flat-square)](#-cross-platform--zero-dependencies)
 
 ---
