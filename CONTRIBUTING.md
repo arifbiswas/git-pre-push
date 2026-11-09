@@ -26,3 +26,4 @@ We welcome contributions from security researchers, developers, and the open-sou
 - **IDE Tampering:** Add configuration checks to `src/rules/ideConfig.js`.
 
 Always include matching unit tests in `test/scanner.test.js` for any new detection rule.
+

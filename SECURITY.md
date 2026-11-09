@@ -20,3 +20,4 @@ Security is our primary mission. If you discover a security vulnerability in `gi
    - Steps to reproduce the bypass or vulnerability
 
 We will review, acknowledge, and issue a patched release promptly.
+
