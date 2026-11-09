@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
+const pkg = require('../package.json');
 const { runPrePush, runManualScan, installHook, uninstallHook } = require('../src/index');
 const { cleanInfectedFiles } = require('../src/cleaner');
 const { setupGitHubAction } = require('../src/action');
 const { runInteractiveMenu } = require('../src/menu');
+const { notifyIfUpdateAvailable, checkUpdateManual } = require('../src/updateNotifier');
 const { banner, colors } = require('../src/reporter');
 
 const args = process.argv.slice(2);
@@ -11,7 +13,18 @@ const command = args[0] ? args[0].toLowerCase() : 'menu';
 const isGlobalFlag = args.includes('--global') || args.includes('-g');
 
 async function main() {
+  // Check for updates non-blocking on interactive commands
+  if (command !== 'scan-push') {
+    await notifyIfUpdateAvailable(pkg.version);
+  }
+
   switch (command) {
+    case 'update':
+    case 'upgrade':
+      banner();
+      await checkUpdateManual(pkg.version);
+      break;
+
     case 'menu':
     case 'interactive':
       await runInteractiveMenu();

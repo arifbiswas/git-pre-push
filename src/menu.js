@@ -22,6 +22,7 @@ async function runInteractiveMenu() {
   console.log(`  ${colors.green}[6]${colors.reset} ⚡  ${colors.bold}Run Push Intercept Demo${colors.reset} - Simulate a blocked malware push`);
   console.log(`  ${colors.green}[7]${colors.reset} 🤖  ${colors.bold}Setup GitHub Action CI${colors.reset}  - Guard repository on GitHub server-side`);
   console.log(`  ${colors.green}[8]${colors.reset} ❌  ${colors.bold}Uninstall Hook${colors.reset}          - Remove pre-push hook`);
+  console.log(`  ${colors.green}[9]${colors.reset} 🔄  ${colors.bold}Check for Updates${colors.reset}       - Check if a new version is available on npm`);
   console.log(`  ${colors.dim}[0] 🚪  Exit${colors.reset}\n`);
 
   const rl = readline.createInterface({
@@ -30,7 +31,7 @@ async function runInteractiveMenu() {
   });
 
   const choice = await new Promise((resolve) => {
-    rl.question(`${colors.bold}${colors.yellow}Enter your choice (1-8, 0 to exit): ${colors.reset}`, (ans) => {
+    rl.question(`${colors.bold}${colors.yellow}Enter your choice (1-9, 0 to exit): ${colors.reset}`, (ans) => {
       rl.close();
       resolve(ans.trim());
     });
@@ -143,6 +144,13 @@ async function runInteractiveMenu() {
       break;
     }
 
+    case '9': {
+      const pkg = require('../package.json');
+      const { checkUpdateManual } = require('./updateNotifier');
+      await checkUpdateManual(pkg.version);
+      break;
+    }
+
     case '0':
     default:
       console.log(`\n${colors.dim}Goodbye! 🛡️${colors.reset}\n`);
@@ -153,3 +161,4 @@ async function runInteractiveMenu() {
 module.exports = {
   runInteractiveMenu
 };
+
