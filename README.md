@@ -170,12 +170,12 @@ npx @arifbiswas/git-pre-push scan-remote
 
 The CLI will prompt you for the GitHub URL:
 ```text
-? Enter GitHub Repository URL: https://github.com/sparktechagency/gantle-backend
+? Enter GitHub Repository URL: https://github.com/my-org/my-project
 ```
 
 Or pass the URL directly:
 ```bash
-npx @arifbiswas/git-pre-push scan-remote https://github.com/sparktechagency/gantle-backend
+npx @arifbiswas/git-pre-push scan-remote https://github.com/my-org/my-project
 ```
 
 **How it works:**

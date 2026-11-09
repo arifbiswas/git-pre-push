@@ -4,10 +4,10 @@ const { parseGitHubUrl } = require('../src/remoteScanner');
 
 describe('Remote Scanner URL Parser', () => {
   it('should parse standard https GitHub URL', () => {
-    const result = parseGitHubUrl('https://github.com/sparktechagency/gantle-backend');
+    const result = parseGitHubUrl('https://github.com/my-org/my-project');
     assert.deepStrictEqual(result, {
-      owner: 'sparktechagency',
-      repo: 'gantle-backend',
+      owner: 'my-org',
+      repo: 'my-project',
       branch: undefined
     });
   });
