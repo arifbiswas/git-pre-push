@@ -82,3 +82,4 @@ module.exports = {
   SUSPICIOUS_EXACT_NAMES,
   BLOCKED_EXTENSIONS
 };
+

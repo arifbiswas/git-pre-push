@@ -79,3 +79,4 @@ main().catch((err) => {
   console.error(`[git-safty error]:`, err);
   process.exit(1);
 });
+

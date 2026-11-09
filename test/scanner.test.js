@@ -143,3 +143,4 @@ describe('Hook Installer and Uninstaller', () => {
     assert.strictEqual(uninstallResult.success, true);
   });
 });
+

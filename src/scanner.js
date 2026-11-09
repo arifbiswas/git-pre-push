@@ -78,3 +78,4 @@ function scanFilesAndDiff(files, diffContent = '', cwd = process.cwd()) {
 module.exports = {
   scanFilesAndDiff
 };
+

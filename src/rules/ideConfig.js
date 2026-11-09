@@ -78,3 +78,4 @@ function inspectIdeConfig(filePath, content) {
 module.exports = {
   inspectIdeConfig
 };
+

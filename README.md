@@ -132,3 +132,4 @@ Developer runs `git push` (from Terminal, VS Code, or any GUI)
 ## 📄 License
 
 MIT © 2026
+
