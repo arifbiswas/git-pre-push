@@ -25,12 +25,14 @@ const { installHook, uninstallHook } = require('./installer');
 async function runPrePush() {
   banner();
 
-  // Read stdin passed by git pre-push hook
+  // Read stdin passed by git pre-push hook (only if piped, not TTY)
   let stdinData = '';
-  try {
-    stdinData = fs.readFileSync(0, 'utf8');
-  } catch (_) {
-    stdinData = '';
+  if (!process.stdin.isTTY) {
+    try {
+      stdinData = fs.readFileSync(0, 'utf8');
+    } catch (_) {
+      stdinData = '';
+    }
   }
 
   const pushes = parsePrePushInput(stdinData);
