@@ -55,3 +55,4 @@ describe('Cloud Scanner Remote Tree Audit', () => {
     assert.ok(result.remediatedFiles.some(f => f.path === 'temp_auto_push.bat'));
   });
 });
+
