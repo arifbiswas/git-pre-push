@@ -128,10 +128,38 @@ This configures `git config --global core.hooksPath`, ensuring every repository 
 |---|---|
 | `npx @arifbiswas/git-pre-push init` | Installs the pre-push security hook into `.git/hooks/pre-push` |
 | `npx @arifbiswas/git-pre-push init --global` | Protects **all** Git repositories across the entire PC |
-| `npx @arifbiswas/git-pre-push scan` | Manually audits workspace files, untracked scripts & staged diffs |
+| `npx @arifbiswas/git-pre-push scan` | Manually audits local workspace files, untracked scripts & staged diffs |
+| `npx @arifbiswas/git-pre-push scan-remote` | **Zero-Clone Audit:** Scans any remote GitHub repo without cloning or downloading |
 | `npx @arifbiswas/git-pre-push clean` | Unstages and quarantines injected malware files to `.git/git-safty-quarantine/` |
+| `npx @arifbiswas/git-pre-push demo` | Simulates a blocked push in terminal |
 | `npx @arifbiswas/git-pre-push action` | Generates a `.github/workflows/git-safty.yml` CI workflow |
 | `npx @arifbiswas/git-pre-push uninstall` | Cleanly removes the hook from `.git/hooks` |
+
+---
+
+## 🌐 Zero-Clone Remote Repository Scanner (`scan-remote`)
+
+Scan any GitHub repository **without cloning or downloading code to your hard drive**:
+
+```bash
+npx @arifbiswas/git-pre-push scan-remote
+```
+
+The CLI will prompt you for the GitHub URL:
+```text
+? Enter GitHub Repository URL: https://github.com/sparktechagency/gantle-backend
+```
+
+Or pass the URL directly:
+```bash
+npx @arifbiswas/git-pre-push scan-remote https://github.com/sparktechagency/gantle-backend
+```
+
+**How it works:**
+1. Fetches the repository's recursive Git tree metadata via GitHub REST API in **1 single HTTP request**.
+2. Performs instant in-memory path matching against all trojan filenames and blacklisted extensions.
+3. Only if a suspicious file is discovered, fetches the specific blob directly into RAM for static payload/secret analysis.
+4. **0 MB downloaded to disk** — fast, lightweight, and completely bandwidth-friendly.
 
 ---
 

@@ -20,6 +20,51 @@ async function main() {
       runManualScan();
       break;
 
+    case 'scan-remote':
+    case 'scan-url':
+    case 'remote': {
+      banner();
+      let repoUrl = args[1];
+
+      if (!repoUrl) {
+        const readline = require('readline');
+        const rl = readline.createInterface({
+          input: process.stdin,
+          output: process.stdout
+        });
+        repoUrl = await new Promise((resolve) => {
+          rl.question(`${colors.bold}${colors.cyan}? Enter GitHub Repository URL (e.g. https://github.com/owner/repo): ${colors.reset}`, (answer) => {
+            rl.close();
+            resolve(answer.trim());
+          });
+        });
+      }
+
+      if (!repoUrl) {
+        console.error(`\n${colors.red}Error: No repository URL provided.${colors.reset}\n`);
+        process.exit(1);
+      }
+
+      const { scanRemoteRepositoryZeroClone, printRemoteScanReport } = require('../src/remoteScanner');
+
+      console.log(`\n${colors.cyan}Starting Zero-Clone In-Memory Security Audit...${colors.reset}`);
+      try {
+        const result = await scanRemoteRepositoryZeroClone(repoUrl, null, (msg) => {
+          console.log(`  ${colors.dim}ℹ ${msg}${colors.reset}`);
+        });
+
+        printRemoteScanReport(result);
+
+        if (result.hasCritical) {
+          process.exit(1);
+        }
+      } catch (err) {
+        console.error(`\n${colors.red}${colors.bold}✖ Scan Failed:${colors.reset} ${err.message}\n`);
+        process.exit(1);
+      }
+      break;
+    }
+
     case 'demo':
     case 'test-run': {
       banner();
@@ -108,10 +153,14 @@ ${colors.bold}Usage:${colors.reset}
   npx git-safty <command>
 
 ${colors.bold}Commands:${colors.reset}
-  ${colors.green}init${colors.reset}       Install the pre-push guard hook into .git/hooks/pre-push
-  ${colors.green}scan${colors.reset}       Scan current repository, staged files & working tree
-  ${colors.green}scan-push${colors.reset}  Triggered automatically by git during 'git push'
-  ${colors.green}uninstall${colors.reset}  Remove git-safty hook from .git/hooks
+  ${colors.green}init${colors.reset}         Install the pre-push guard hook into .git/hooks/pre-push
+  ${colors.green}scan${colors.reset}         Scan current local repository, staged files & working tree
+  ${colors.green}scan-remote${colors.reset}  Scan remote GitHub repository without downloading or cloning
+  ${colors.green}clean${colors.reset}        Quarantine injected malware scripts (.bat, .ps1, trojans)
+  ${colors.green}action${colors.reset}       Generate GitHub Actions CI workflow for server-side guard
+  ${colors.green}demo${colors.reset}         Run a simulated malicious push test in terminal
+  ${colors.green}scan-push${colors.reset}    Triggered automatically by git during 'git push'
+  ${colors.green}uninstall${colors.reset}    Remove git-safty hook from .git/hooks
 
 ${colors.bold}How it works:${colors.reset}
   1. Run ${colors.cyan}npx git-safty init${colors.reset} in any git repository.
