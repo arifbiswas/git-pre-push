@@ -60,3 +60,4 @@ module.exports = {
   setupGitHubAction,
   WORKFLOW_YAML
 };
+

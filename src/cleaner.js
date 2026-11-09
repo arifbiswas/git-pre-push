@@ -54,3 +54,4 @@ function cleanInfectedFiles(cwd = process.cwd()) {
 module.exports = {
   cleanInfectedFiles
 };
+

@@ -47,3 +47,4 @@ module.exports = {
   loadConfig,
   DEFAULT_CONFIG
 };
+
