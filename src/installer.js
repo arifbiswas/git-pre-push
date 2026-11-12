@@ -9,7 +9,8 @@ const HOOK_TYPES = ['pre-push', 'post-checkout', 'post-merge'];
 
 // Absolute path of this installation's CLI, baked into the hook so a cloned
 // repository can never substitute its own ./bin/cli.js or node_modules copy.
-const CLI_PATH = path.resolve(__dirname, '..', 'bin', 'cli.js');
+// Forward slashes so Git for Windows' sh can test and run the path too.
+const CLI_PATH = path.resolve(__dirname, '..', 'bin', 'cli.js').replace(/\\/g, '/');
 
 function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;

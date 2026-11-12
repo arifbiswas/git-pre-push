@@ -1,15 +1,26 @@
 name: GitSafty Security Guard
 
+# GitSafty scans its own repository with the code from this commit
+# (never a package downloaded from npm), and proves its native unlock
+# helpers still build on macOS and Windows.
+
 on:
   push:
     branches: [ "**" ]
   pull_request:
     branches: [ "**" ]
 
+permissions:
+  contents: read
+
 jobs:
-  security-scan:
-    name: Scan Outgoing Commits for Malware & Secrets
-    runs-on: ubuntu-latest
+  self-scan:
+    name: Self-scan on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -21,6 +32,54 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Run GitSafty Security Audit
+      - name: Scan this repository with this commit's GitSafty
+        shell: bash
+        env:
+          NO_UPDATE_NOTIFIER: '1'
+          GITSAFTY_NO_NOTIFY: '1'
+        run: node bin/cli.js scan --no-clean
+
+      - name: End-to-end clone / pull / push protection
+        shell: bash
+        env:
+          GITSAFTY_NO_NOTIFY: '1'
+        run: node --test test/e2e.test.js
+
+  macos-secure-enclave-helper:
+    name: Build Secure Enclave helper (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile Swift helper
+        run: swiftc -O src/hwkey/secure-enclave.swift -o "$RUNNER_TEMP/gitsafty-se"
+      - name: Run helper check
+        # CI VMs have no Secure Enclave: exit 2 ("not available") is expected,
+        # anything else means the helper is broken.
         run: |
-          npx git-safty scan
+          set +e
+          "$RUNNER_TEMP/gitsafty-se" check
+          code=$?
+          echo "exit code: $code"
+          if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then exit 1; fi
+
+  windows-hello-helper:
+    name: Check Windows Hello helper (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell helper
+        shell: powershell
+        run: |
+          $errors = $null
+          $null = [System.Management.Automation.Language.Parser]::ParseFile("$PWD\src\hwkey\windows-hello.ps1", [ref]$null, [ref]$errors)
+          if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_.ToString() }; exit 1 }
+          Write-Output 'windows-hello.ps1 parses cleanly'
+      - name: Run helper check
+        # CI runners have no Windows Hello set up: exit 2 is expected.
+        shell: powershell
+        run: |
+          & powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File src\hwkey\windows-hello.ps1 -Op check
+          $code = $LASTEXITCODE
+          Write-Output "exit code: $code"
+          if ($code -ne 0 -and $code -ne 2) { exit 1 }
+          exit 0
