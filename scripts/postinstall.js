@@ -31,5 +31,17 @@ function main() {
   }
 }
 
-main();
+// A postinstall error must never make `npm install` fail: explain and move on.
+try {
+  main();
+} catch (err) {
+  console.warn(`[git-safty] Installed, but hook setup did not finish: ${err && err.message}`);
+  try {
+    const { hintForError } = require('../src/doctor');
+    const hint = hintForError(err);
+    console.warn(`[git-safty] ${hint.problem}`);
+    for (const c of hint.commands) console.warn(`    ${c}`);
+  } catch (_) {}
+  console.warn('[git-safty] Check everything with: gitsafty doctor');
+}
 

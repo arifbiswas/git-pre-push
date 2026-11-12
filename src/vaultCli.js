@@ -3,6 +3,7 @@
  */
 
 const { colors } = require('./reporter');
+const { printHint } = require('./doctor');
 
 /**
  * @param {string} sub setup | status | test | remove
@@ -16,7 +17,8 @@ async function runVaultCommand(sub = 'status', { host, passphrase = false } = {}
   if (sub === 'setup' || sub === 'on' || sub === 'enable') {
     const res = await vault.setupVault({ host: host || 'github.com', mode: passphrase ? 'passphrase' : 'auto' });
     if (!res.success) {
-      console.error(`\n${colors.red}${colors.bold}✖ ${res.message}${colors.reset}\n`);
+      console.error(`\n${colors.red}${colors.bold}✖ ${res.message}${colors.reset}`);
+      printHint(new Error(res.message));
       return 1;
     }
     console.log(`\n${colors.green}${colors.bold}✔ ${res.message}${colors.reset}`);
@@ -32,6 +34,7 @@ async function runVaultCommand(sub = 'status', { host, passphrase = false } = {}
   if (sub === 'test') {
     const res = vault.testUnlock();
     console.log(`\n${res.success ? colors.green + '✔' : colors.red + '✖'} ${res.message}${colors.reset}\n`);
+    if (!res.success) printHint(new Error(res.message));
     return res.success ? 0 : 1;
   }
 

@@ -511,6 +511,10 @@ function runCredentialHelper(operation, inputText, out = process.stdout) {
       token = unlockVault(vault, `log in ${who} for one git command in "${repo}"`);
     } catch (err) {
       process.stderr.write(`GitSafty Vault: ${err.message}. Staying logged out.\n`);
+      try {
+        const hint = require('./doctor').hintForError(err);
+        process.stderr.write(`  What to do: ${hint.problem}\n${hint.commands.map(c => `    ${c}\n`).join('')}`);
+      } catch (_) {}
       notify('GitSafty Vault: login refused', `A git command in "${repo}" asked for your GitHub login and was refused. If you did not start it, your PC may be compromised.`);
       out.write('quit=1\n\n');
       return 0;
