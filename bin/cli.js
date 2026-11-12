@@ -304,7 +304,6 @@ async function main() {
         console.log(`\n${colors.green}${colors.bold}✔ ${result.message}${colors.reset}\n`);
         console.log(`${colors.cyan}Your git environment is now protected!${colors.reset}`);
         console.log(`${colors.dim}Every git push, clone and pull${isGlobalFlag ? ' on this PC' : ' in this repository'} is scanned for malware & secret leaks.${colors.reset}\n`);
-        if (isGlobalFlag) await offerPullScan();
         const { offerPermanentInstall } = require('../src/updateNotifier');
         await offerPermanentInstall(['init', ...(isGlobalFlag ? ['--global'] : [])]);
       } else {
