@@ -25,8 +25,10 @@ jobs:
           node-version: '20'
 
       - name: Run GitSafty Security Audit
+        # Scoped package name: an unscoped "git-safty" does not exist on npm
+        # and could be registered by anyone.
         run: |
-          npx git-safty scan
+          npx --yes @arifbiswas/git-pre-push scan --no-clean
 `;
 
 /**
