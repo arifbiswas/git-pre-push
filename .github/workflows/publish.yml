@@ -9,6 +9,13 @@ on:
 permissions:
   contents: write
 
+# Releases run one at a time. Two PRs merged seconds apart used to start two
+# runs that both picked the same version: one pushed tag v1.0.14 but not the
+# bump commit, and every later run failed with "tag already exists".
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
 jobs:
   release:
     name: Test, Bump Version & Publish
@@ -16,9 +23,10 @@ jobs:
     # Prevent infinite loop on automated release commit
     if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, 'chore(release):')"
     steps:
-      - name: Checkout Repository
+      - name: Checkout latest main
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -44,17 +52,46 @@ jobs:
             exit 1
           fi
 
-      - name: Bump Version (Patch)
+      - name: Pick next version
+        id: version
+        # Next patch after the highest of package.json, the npm registry and
+        # existing v* tags, so a stray tag or a failed run can't block releases.
         run: |
-          npm version patch -m "chore(release): bump version to %s [skip ci]"
+          git fetch --tags --force origin
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          NPM_VERSION=$(npm view "$(node -p "require('./package.json').name")" version 2>/dev/null || echo 0.0.0)
+          TAG_VERSION=$(git tag -l 'v[0-9]*' | sed 's/^v//' | sort -V | tail -1)
+          NEXT=$(node -e '
+            const v = process.argv.slice(1).filter(Boolean).map(s => s.split(".").map(Number));
+            v.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+            const [M, m, p] = v[v.length - 1];
+            console.log(`${M}.${m}.${p + 1}`);
+          ' "$PKG_VERSION" "$NPM_VERSION" "${TAG_VERSION:-0.0.0}")
+          echo "package.json=$PKG_VERSION npm=$NPM_VERSION tag=${TAG_VERSION:-none} -> next=$NEXT"
+          echo "next=$NEXT" >> "$GITHUB_OUTPUT"
 
-      - name: Push Version Tag to GitHub
+      - name: Bump Version
         run: |
-          git push --follow-tags
+          npm version "${{ steps.version.outputs.next }}" -m "chore(release): bump version to %s [skip ci]"
+
+      - name: Push bump commit and tag together
+        # --atomic: either main AND the tag are updated, or neither is.
+        # If main moved meanwhile, replay the bump on top and try again.
+        run: |
+          TAG="v${{ steps.version.outputs.next }}"
+          for attempt in 1 2 3; do
+            if git push --atomic origin HEAD:main "$TAG"; then
+              exit 0
+            fi
+            echo "main moved, rebasing the release commit (attempt $attempt)"
+            git fetch origin main
+            git rebase origin/main
+            git tag -f -a "$TAG" -m "chore(release): bump version to ${{ steps.version.outputs.next }} [skip ci]"
+          done
+          echo "::error::Could not push the release commit after 3 attempts"
+          exit 1
 
       - name: Publish to NPM Registry
-        run: |
-          npm publish --access public
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
