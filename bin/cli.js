@@ -51,6 +51,18 @@ async function offerPullScan() {
 async function main() {
   // Check for updates non-blocking on interactive commands
   const hookCommands = ['scan-push', 'scan-checkout', 'scan-merge', 'scan-rewrite', 'scan-pull', 'credential'];
+  // Keep the global hooks and the pull-scan shell function in step with this
+  // version. npm 11+ blocks postinstall scripts, so updates can't do it.
+  if (command !== 'credential' && process.env.GITSAFTY_NO_SELF_REFRESH !== '1') {
+    try {
+      const refreshed = require('../src/installer').refreshOutdatedHooks();
+      const shells = require('../src/shellIntegration').refreshShellIntegration();
+      if ((refreshed.length || shells.length) && !hookCommands.includes(command)) {
+        console.log(`${colors.green}✔ GitSafty ${pkg.version}: updated ${[...refreshed.map(t => `${t} hook`), ...shells.map(f => require('path').basename(f))].join(', ')} to this version.${colors.reset}`);
+      }
+    } catch (_) {}
+  }
+
   // `gitsafty update` does its own check below.
   if (!hookCommands.includes(command) && command !== 'update' && command !== 'upgrade') {
     // Opening the menu always asks the registry, so a fresh release is never missed.

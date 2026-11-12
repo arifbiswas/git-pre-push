@@ -180,6 +180,22 @@ function removeShellIntegration() {
   return { files };
 }
 
+/** Re-writes installed blocks that are from another version. @returns {string[]} files updated */
+function refreshShellIntegration() {
+  const updated = [];
+  for (const t of targets()) {
+    if (!fs.existsSync(t.file)) continue;
+    const text = fs.readFileSync(t.file, 'utf8');
+    if (!text.includes(START) || text.includes(blockFor(t.kind).trim())) continue;
+    // Same rule as the hooks: only this copy's own block, or a real global install may take it over.
+    const ownBlock = text.includes(cliPath()) || text.includes(cliPath().replace(/'/g, "''"));
+    if (!ownBlock && !require('./installer').isPermanentGlobalInstall(cliPath())) continue;
+    fs.writeFileSync(t.file, stripBlock(text).replace(/\s*$/, '') + '\n\n' + blockFor(t.kind));
+    updated.push(t.file);
+  }
+  return updated;
+}
+
 function shellIntegrationStatus() {
   const installed = targets().filter(t => fs.existsSync(t.file) && fs.readFileSync(t.file, 'utf8').includes(START)).map(t => t.file);
   return { installed, cliExists: fs.existsSync(cliPath()) };
@@ -204,6 +220,7 @@ module.exports = {
   END,
   installShellIntegration,
   removeShellIntegration,
+  refreshShellIntegration,
   shellIntegrationStatus,
   reloadHint,
   posixBlock,
