@@ -50,6 +50,13 @@ Run without arguments to open the interactive selection dashboard:
 npx @arifbiswas/git-pre-push
 ```
 
+> **`gitsafty` "not recognized" / "command not found"?** `npx` only runs GitSafty from a temporary cache; it does not install the `gitsafty` command. Install it permanently (GitSafty also offers this after `npx ... init`):
+> ```bash
+> npm install -g @arifbiswas/git-pre-push
+> gitsafty init --global
+> ```
+> Then open a **new** terminal. On Windows, if it is still not found, add the folder printed by `npm config get prefix` to your `Path` environment variable.
+
 Or if installed globally (`npm i -g @arifbiswas/git-pre-push`):
 ```bash
 gitsafty
