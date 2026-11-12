@@ -261,7 +261,7 @@ ${colors.bold}Usage:${colors.reset}
   npx git-safty <command>
 
 ${colors.bold}Commands:${colors.reset}
-  ${colors.green}init${colors.reset}         Install the pre-push guard hook into .git/hooks/pre-push
+  ${colors.green}init${colors.reset}         Protect this repo (push + checkout + pull). ${colors.green}init --global${colors.reset}: every repo on this PC
   ${colors.green}scan${colors.reset}         Scan current local repository, staged files & working tree
   ${colors.green}scan-remote${colors.reset}  Scan remote GitHub repository without downloading or cloning
   ${colors.green}clean${colors.reset}        Quarantine injected malware scripts (.bat, .ps1, trojans)
@@ -275,6 +275,10 @@ ${colors.bold}Commands:${colors.reset}
   ${colors.green}vault status${colors.reset} Show vault / credential helper / SSH key protection status
   ${colors.green}vault test${colors.reset}   Try one unlock (prompt) without using the token
   ${colors.green}vault remove${colors.reset} Turn the vault off and go back to normal git login
+  ${colors.green}scan-projects${colors.reset} <folder>  Advanced Scanner: audit EVERY project in a folder at once
+               (malware, git backdoors, IDE auto-run, secrets) [--clean] [--deep] [--json]
+  ${colors.green}doctor${colors.reset}       Find broken/outdated installs and show the exact fix (--fix applies it)
+  ${colors.green}update${colors.reset}       Check npm for a new version and install it
   ${colors.green}uninstall${colors.reset}    Remove hooks from this repo (outside a repo, or with --global: remove global hooks)
 
 ${colors.bold}How it works:${colors.reset}
