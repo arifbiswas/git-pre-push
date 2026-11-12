@@ -6,6 +6,8 @@ const {
   runManualScan,
   runPostCheckout,
   runPostMerge,
+  runPostRewrite,
+  runScanPull,
   runSweep,
   scanAndCleanRepo,
   installHook,
@@ -21,9 +23,34 @@ const args = process.argv.slice(2);
 const command = args[0] ? args[0].toLowerCase() : 'menu';
 const isGlobalFlag = args.includes('--global') || args.includes('-g');
 
+/** After a global install: offer the shell function that scans every git pull. */
+async function offerPullScan() {
+  const shell = require('../src/shellIntegration');
+  if (shell.shellIntegrationStatus().installed.length) {
+    shell.installShellIntegration(); // refresh with this version's paths
+    return;
+  }
+  const interactive = process.stdin.isTTY && process.stdout.isTTY && !process.env.CI;
+  console.log(`${colors.dim}git runs no hook when a pull is "Already up to date". To scan after EVERY git pull,${colors.reset}`);
+  console.log(`${colors.dim}GitSafty can add a small git function to your shell profile (.zshrc / .bashrc / PowerShell profile).${colors.reset}`);
+  if (!interactive) {
+    console.log(`  Turn it on: ${colors.cyan}gitsafty pull-scan on${colors.reset}\n`);
+    return;
+  }
+  const readline = require('readline');
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await new Promise(r => rl.question(`${colors.bold}${colors.cyan}? Scan after every git pull? (Y/n): ${colors.reset}`, a => { rl.close(); r(a.trim()); }));
+  if (/^n(o)?$/i.test(answer)) {
+    console.log(`  ${colors.dim}Skipped. Turn it on later: gitsafty pull-scan on${colors.reset}\n`);
+    return;
+  }
+  const res = shell.installShellIntegration();
+  console.log(`${colors.green}✔ Pull scan on${colors.reset} ${colors.dim}(${res.files.join(', ')})${colors.reset}. Load it now: ${colors.cyan}${shell.reloadHint()}${colors.reset}\n`);
+}
+
 async function main() {
   // Check for updates non-blocking on interactive commands
-  const hookCommands = ['scan-push', 'scan-checkout', 'scan-merge', 'credential'];
+  const hookCommands = ['scan-push', 'scan-checkout', 'scan-merge', 'scan-rewrite', 'scan-pull', 'credential'];
   // `gitsafty update` does its own check below.
   if (!hookCommands.includes(command) && command !== 'update' && command !== 'upgrade') {
     // Opening the menu always asks the registry, so a fresh release is never missed.
@@ -108,6 +135,54 @@ async function main() {
       banner();
       const { runDoctor } = require('../src/doctor');
       process.exit(runDoctor({ fix: args.includes('--fix') }));
+      break;
+    }
+
+    // Triggered by the post-rewrite hook (git pull --rebase)
+    case 'scan-rewrite':
+      try {
+        runPostRewrite(args[1]);
+      } catch (err) {
+        console.error(`[GitSafty] pull scan error: ${err.message}`);
+        try { require('../src/doctor').printHint(err); } catch (_) {}
+      }
+      process.exit(0);
+      break;
+
+    // Called by the optional shell git wrapper after every git pull
+    case 'scan-pull':
+      try {
+        runScanPull();
+      } catch (err) {
+        console.error(`[GitSafty] pull scan error: ${err.message}`);
+      }
+      process.exit(0);
+      break;
+
+    case 'pull-scan':
+    case 'shell-integration': {
+      banner();
+      const shell = require('../src/shellIntegration');
+      const sub = (args[1] || 'status').toLowerCase();
+      if (sub === 'on' || sub === 'install' || sub === 'enable') {
+        const res = shell.installShellIntegration();
+        if (!res.files.length) {
+          console.log(`\n${colors.yellow}No shell profile found to update.${colors.reset}\n`);
+        } else {
+          console.log(`\n${colors.green}${colors.bold}✔ Every git pull will now be scanned (also "Already up to date").${colors.reset}`);
+          for (const f of res.files) console.log(`  ${colors.dim}updated ${f}${colors.reset}`);
+          console.log(`  Load it now: ${colors.cyan}${shell.reloadHint()}${colors.reset}\n`);
+        }
+      } else if (sub === 'off' || sub === 'remove' || sub === 'disable') {
+        const res = shell.removeShellIntegration();
+        console.log(`\n${colors.yellow}${colors.bold}✔ Pull scan shell function removed${res.files.length ? ` from ${res.files.join(', ')}` : ' (was not installed)'}.${colors.reset}`);
+        console.log(`  ${colors.dim}Open a new terminal to finish. Pulls that bring changes are still scanned by the git hooks.${colors.reset}\n`);
+      } else {
+        const st = shell.shellIntegrationStatus();
+        console.log(st.installed.length
+          ? `\n${colors.green}✔ Pull scan is ON${colors.reset} ${colors.dim}(${st.installed.join(', ')})${colors.reset}\n`
+          : `\n${colors.yellow}Pull scan shell function is OFF.${colors.reset} Pulls that bring changes are still scanned by the git hooks.\n  Turn on scanning for every pull: ${colors.cyan}gitsafty pull-scan on${colors.reset}\n`);
+      }
       break;
     }
 
@@ -244,6 +319,10 @@ async function main() {
       const result = uninstallHook(process.cwd(), isGlobalFlag);
       if (result.success) {
         console.log(`\n${colors.yellow}${colors.bold}✔ ${result.message}${colors.reset}\n`);
+        if (/global/i.test(result.message)) {
+          const removed = require('../src/shellIntegration').removeShellIntegration();
+          if (removed.files.length) console.log(`${colors.dim}Also removed the git pull scan function from ${removed.files.join(', ')}.${colors.reset}\n`);
+        }
       } else {
         console.error(`\n${colors.red}${colors.bold}✖ ${result.message}${colors.reset}\n`);
         process.exit(1);
@@ -258,10 +337,10 @@ async function main() {
       banner();
       console.log(`
 ${colors.bold}Usage:${colors.reset}
-  npx git-safty <command>
+  npx @arifbiswas/git-pre-push <command>
 
 ${colors.bold}Commands:${colors.reset}
-  ${colors.green}init${colors.reset}         Install the pre-push guard hook into .git/hooks/pre-push
+  ${colors.green}init${colors.reset}         Protect this repo (push + checkout + pull). ${colors.green}init --global${colors.reset}: every repo on this PC
   ${colors.green}scan${colors.reset}         Scan current local repository, staged files & working tree
   ${colors.green}scan-remote${colors.reset}  Scan remote GitHub repository without downloading or cloning
   ${colors.green}clean${colors.reset}        Quarantine injected malware scripts (.bat, .ps1, trojans)
@@ -277,18 +356,20 @@ ${colors.bold}Commands:${colors.reset}
   ${colors.green}vault remove${colors.reset} Turn the vault off and go back to normal git login
   ${colors.green}scan-projects${colors.reset} <folder>  Advanced Scanner: audit EVERY project in a folder at once
                (malware, git backdoors, IDE auto-run, secrets) [--clean] [--deep] [--json]
+  ${colors.green}pull-scan${colors.reset} on|off  Scan after EVERY git pull, also "Already up to date" (adds a git shell function)
   ${colors.green}doctor${colors.reset}       Find broken/outdated installs and show the exact fix (--fix applies it)
+  ${colors.green}update${colors.reset}       Check npm for a new version and install it
   ${colors.green}uninstall${colors.reset}    Remove hooks from this repo (outside a repo, or with --global: remove global hooks)
 
 ${colors.bold}How it works:${colors.reset}
-  1. Run ${colors.cyan}npx git-safty init${colors.reset} in any git repository.
+  1. Run ${colors.cyan}npx @arifbiswas/git-pre-push init${colors.reset} in any git repository.
   2. Whenever you run ${colors.cyan}git push${colors.reset}, GitSafty automatically intercepts and scans:
      - Outgoing modified files for blacklisted & trojan scripts (temp_auto_push.bat, .vbs, .ps1, .exe, etc.)
      - Outgoing diff content for obfuscated payloads (base64 eval, powershell cradles, curl | bash, lolbins)
      - IDE settings (.vscode/tasks.json, .vscode/settings.json, JetBrains configs)
      - Leaked API keys, private keys, and .env files
   3. If malware or critical secrets are detected, ${colors.red}${colors.bold}the push is rejected immediately${colors.reset}!
-  4. With ${colors.cyan}npx git-safty init --global${colors.reset}, every ${colors.cyan}git clone${colors.reset} / ${colors.cyan}git pull${colors.reset} on this device is scanned too.
+  4. With ${colors.cyan}npx @arifbiswas/git-pre-push init --global${colors.reset}, every ${colors.cyan}git clone${colors.reset} / ${colors.cyan}git pull${colors.reset} on this device is scanned too.
      ${colors.bold}Confirmed${colors.reset} malware is removed automatically (backup kept in .git/gitsafty-quarantine/).
      ${colors.bold}Suspicious${colors.reset} items are only reported, never touched.
      Disable auto-removal with ${colors.cyan}"autoClean": false${colors.reset} in .gitsafetyrc.json or GITSAFTY_NO_AUTOCLEAN=1.

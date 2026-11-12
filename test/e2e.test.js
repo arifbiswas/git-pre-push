@@ -159,4 +159,17 @@ describe('End-to-end: clone, pull and push are protected', () => {
     assert.match(pull.stdout + pull.stderr, /MALWARE/);
     assertCleaned(other);
   });
+
+  it('git pull --rebase: also scanned (post-rewrite / fast-forward)', () => {
+    const remote = path.join(sandbox, 'remote.git');
+    const fresh = path.join(sandbox, 'rebase-clone');
+    mustGit(['clone', '-q', remote, fresh], sandbox, { GITSAFTY_SKIP: '1' });
+    const dev = path.join(sandbox, 'dev');
+    fs.writeFileSync(path.join(dev, 'b.js'), 'export const b = 2;\n');
+    mustGit(['add', '-A'], dev);
+    mustGit(['commit', '-q', '-m', 'more'], dev);
+    mustGit(['push', '-q', 'origin', 'main'], dev);
+    const pull = mustGit(['pull', '--rebase', 'origin', 'main'], fresh);
+    assert.match(pull.stdout + pull.stderr, /GitSafty/);
+  });
 });

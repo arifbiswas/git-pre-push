@@ -34,6 +34,7 @@ async function runInteractiveMenu() {
   section('Protection');
   item(1, '🛡️ ', 'Install Local Hook', 'Protect current repo (push + checkout + pull)');
   item(2, '🌐', 'Install Global Hook', 'Protect EVERY repo on this PC: scan on clone, pull & push');
+  item(17, '🔁', 'Scan Every Pull', 'Also scan when git pull says "Already up to date"');
   item(8, '❌', 'Uninstall Hook', 'Remove GitSafty hooks (this repo or whole PC)');
 
   section('Malware scan & removal');
@@ -62,7 +63,7 @@ async function runInteractiveMenu() {
   });
 
   const choice = await new Promise((resolve) => {
-    rl.question(`${colors.bold}${colors.yellow}Enter your choice (1-16, 0 to exit): ${colors.reset}`, (ans) => {
+    rl.question(`${colors.bold}${colors.yellow}Enter your choice (1-17, 0 to exit): ${colors.reset}`, (ans) => {
       rl.close();
       resolve(ans.trim());
     });
@@ -242,6 +243,22 @@ async function runInteractiveMenu() {
         deep: /^y(es)?$/i.test(deep),
         clean: /^y(es)?$/i.test(clean)
       });
+      break;
+    }
+
+    case '17': {
+      const shell = require('./shellIntegration');
+      const on = shell.shellIntegrationStatus().installed.length > 0;
+      const answer = await ask(`\n${colors.bold}${colors.cyan}? Pull scan is ${on ? 'ON' : 'OFF'}. Turn it ${on ? 'off' : 'on'}? (y/N): ${colors.reset}`);
+      if (/^y(es)?$/i.test(answer)) {
+        if (on) {
+          const r = shell.removeShellIntegration();
+          console.log(`\n${colors.yellow}✔ Turned off (${r.files.join(', ')}). Open a new terminal.${colors.reset}\n`);
+        } else {
+          const r = shell.installShellIntegration();
+          console.log(`\n${colors.green}✔ Every git pull is now scanned (${r.files.join(', ')}).${colors.reset} Load it: ${colors.cyan}${shell.reloadHint()}${colors.reset}\n`);
+        }
+      }
       break;
     }
 
