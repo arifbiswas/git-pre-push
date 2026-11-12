@@ -30,3 +30,11 @@ describe('Update Notifier Semver Comparison', () => {
   });
 });
 
+
+describe('Update installer: install kind detection', () => {
+  const { installKind } = require('../src/updateNotifier');
+  it('recognises npx and project-dependency copies (never auto-installs those)', () => {
+    assert.strictEqual(installKind('/home/u/.npm/_npx/abc/node_modules/@arifbiswas/git-pre-push/bin/cli.js'), 'npx');
+    assert.strictEqual(installKind('/work/app/node_modules/@arifbiswas/git-pre-push/bin/cli.js'), 'local-dependency');
+  });
+});

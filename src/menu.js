@@ -38,6 +38,7 @@ async function runInteractiveMenu() {
 
   section('Malware scan & removal');
   item(3, '🔍', 'Scan Local Workspace', 'Deep scan this repo, auto-remove confirmed malware');
+  item(16, '🔬', 'Advanced Scanner', 'Audit ALL projects in a folder: malware, backdoors, secrets');
   item(10, '🧹', 'Sweep All Repos', 'Scan every git repo in a folder (whole device)');
   item(5, '🗑️ ', 'Clean & Quarantine', 'Remove confirmed malware + trojan scripts here');
   item(4, '🚀', 'Scan Remote GitHub Repo', 'Zero-clone audit (no download/clone)');
@@ -52,6 +53,7 @@ async function runInteractiveMenu() {
   item(6, '⚡', 'Run Push Intercept Demo', 'Simulate a blocked malware push');
   item(7, '🤖', 'Setup GitHub Action CI', 'Guard repository on GitHub server-side');
   item(9, '🔄', 'Check for Updates', 'Check if a new version is available on npm');
+  item(15, '🩺', 'Doctor', 'Something broken? Find it and show/apply the fix');
   console.log(`  ${colors.dim}[0]  🚪  Exit${colors.reset}\n`);
 
   const rl = readline.createInterface({
@@ -60,7 +62,7 @@ async function runInteractiveMenu() {
   });
 
   const choice = await new Promise((resolve) => {
-    rl.question(`${colors.bold}${colors.yellow}Enter your choice (1-14, 0 to exit): ${colors.reset}`, (ans) => {
+    rl.question(`${colors.bold}${colors.yellow}Enter your choice (1-16, 0 to exit): ${colors.reset}`, (ans) => {
       rl.close();
       resolve(ans.trim());
     });
@@ -217,6 +219,29 @@ async function runInteractiveMenu() {
       } else {
         console.log(`${colors.dim}Vault kept.${colors.reset}\n`);
       }
+      break;
+    }
+
+    case '15': {
+      const { runDoctor, runChecks } = require('./doctor');
+      runDoctor();
+      const fixable = runChecks().some(c => c.fix && c.level !== 'ok');
+      if (fixable) {
+        const fixIt = await ask(`${colors.bold}${colors.cyan}? Apply the safe fixes now? (y/N): ${colors.reset}`);
+        if (/^y(es)?$/i.test(fixIt)) runDoctor({ fix: true });
+      }
+      break;
+    }
+
+    case '16': {
+      const { runAdvancedScan } = require('./advancedScanner');
+      const folder = await ask(`\n${colors.bold}${colors.cyan}? Folder that contains your projects (Enter = ${process.cwd()}): ${colors.reset}`);
+      const deep = await ask(`${colors.bold}${colors.cyan}? Deep scan incl. node_modules & ignored files? Slower. (y/N): ${colors.reset}`);
+      const clean = await ask(`${colors.bold}${colors.cyan}? Automatically remove CONFIRMED malware? Everything else is only reported. (y/N): ${colors.reset}`);
+      runAdvancedScan(folder || process.cwd(), {
+        deep: /^y(es)?$/i.test(deep),
+        clean: /^y(es)?$/i.test(clean)
+      });
       break;
     }
 

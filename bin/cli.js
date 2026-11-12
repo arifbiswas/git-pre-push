@@ -24,8 +24,10 @@ const isGlobalFlag = args.includes('--global') || args.includes('-g');
 async function main() {
   // Check for updates non-blocking on interactive commands
   const hookCommands = ['scan-push', 'scan-checkout', 'scan-merge', 'credential'];
-  if (!hookCommands.includes(command)) {
-    await notifyIfUpdateAvailable(pkg.version);
+  // `gitsafty update` does its own check below.
+  if (!hookCommands.includes(command) && command !== 'update' && command !== 'upgrade') {
+    // Opening the menu always asks the registry, so a fresh release is never missed.
+    await notifyIfUpdateAvailable(pkg.version, { force: command === 'menu' || command === 'interactive' });
   }
 
   switch (command) {
@@ -49,6 +51,7 @@ async function main() {
         runPostCheckout(args[1], args[2], args[3]);
       } catch (err) {
         console.error(`[GitSafty] clone/checkout scan error: ${err.message}`);
+        try { require('../src/doctor').printHint(err); } catch (_) {}
       }
       process.exit(0);
       break;
@@ -59,6 +62,7 @@ async function main() {
         runPostMerge();
       } catch (err) {
         console.error(`[GitSafty] pull scan error: ${err.message}`);
+        try { require('../src/doctor').printHint(err); } catch (_) {}
       }
       process.exit(0);
       break;
@@ -82,6 +86,28 @@ async function main() {
         passphrase: args.includes('--passphrase')
       });
       if (code) process.exit(code);
+      break;
+    }
+
+    case 'scan-projects':
+    case 'advanced':
+    case 'advanced-scan': {
+      banner();
+      const { runAdvancedScan } = require('../src/advancedScanner');
+      const target = args.find((a, i) => i > 0 && !a.startsWith('-')) || process.cwd();
+      process.exit(runAdvancedScan(target, {
+        clean: args.includes('--clean'),
+        deep: args.includes('--deep'),
+        json: args.includes('--json')
+      }));
+      break;
+    }
+
+    case 'doctor':
+    case 'fix-install': {
+      banner();
+      const { runDoctor } = require('../src/doctor');
+      process.exit(runDoctor({ fix: args.includes('--fix') }));
       break;
     }
 
@@ -137,6 +163,7 @@ async function main() {
         }
       } catch (err) {
         console.error(`\n${colors.red}${colors.bold}✖ Scan Failed:${colors.reset} ${err.message}\n`);
+        require('../src/doctor').printHint(err);
         process.exit(1);
       }
       break;
@@ -268,7 +295,8 @@ ${colors.bold}Zero Dependencies:${colors.reset} 100% pure Node.js built-ins.
 }
 
 main().catch((err) => {
-  console.error(`[git-safty error]:`, err);
+  console.error(`${colors.red}${colors.bold}✖ GitSafty error:${colors.reset} ${err && err.message ? err.message : err}`);
+  try { require('../src/doctor').printHint(err); } catch (_) {}
   process.exit(1);
 });
 

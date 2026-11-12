@@ -65,10 +65,11 @@ Select an action to perform:
   ── Protection ──
   [1]  🛡️   Install Local Hook       - Protect current repo (push + checkout + pull)
   [2]  🌐  Install Global Hook      - Protect EVERY repo on this PC: scan on clone, pull & push
-  [8]  ❌  Uninstall Hook           - Remove GitSafty hooks
+  [8]  ❌  Uninstall Hook           - Remove GitSafty hooks (this repo or whole PC)
 
   ── Malware scan & removal ──
   [3]  🔍  Scan Local Workspace     - Deep scan this repo, auto-remove confirmed malware
+  [16] 🔬  Advanced Scanner         - Audit ALL projects in a folder: malware, backdoors, secrets
   [10] 🧹  Sweep All Repos          - Scan every git repo in a folder (whole device)
   [5]  🗑️   Clean & Quarantine       - Remove confirmed malware + trojan scripts here
   [4]  🚀  Scan Remote GitHub Repo  - Zero-clone audit (no download/clone)
@@ -83,12 +84,15 @@ Select an action to perform:
   [6]  ⚡  Run Push Intercept Demo  - Simulate a blocked malware push
   [7]  🤖  Setup GitHub Action CI   - Guard repository on GitHub server-side
   [9]  🔄  Check for Updates        - Check if a new version is available on npm
+  [15] 🩺  Doctor                   - Something broken? Find it and show/apply the fix
   [0]  🚪  Exit
 
-Enter your choice (1-14, 0 to exit):
+Enter your choice (1-16, 0 to exit):
 ```
 
 ---
+
+**Updates:** every time you open `gitsafty` it checks npm. When a new version is out it asks `Install GitSafty x.y.z now? (Y/n)`; answer `y` and it installs and reopens the new version (global installs only; never inside git hooks or CI). Turn the question off with `GITSAFTY_NO_UPDATE_PROMPT=1`.
 
 ### Option 3: Lock Down an Entire Machine (Global Protection)
 
@@ -209,6 +213,69 @@ Limits, honestly: the chip stops token theft (copying files, Keychain or browser
 
 ---
 
+## 🔬 Advanced Scanner (many projects at once)
+
+Got a folder with 20 projects? Audit all of them in one go:
+
+```bash
+gitsafty scan-projects ~/projects            # report only
+gitsafty scan-projects ~/projects --clean    # also remove CONFIRMED malware
+gitsafty scan-projects ~/projects --deep     # include node_modules, build output, ignored files
+gitsafty scan-projects ~/projects --json     # machine-readable output
+```
+
+Every direct sub-folder is a project (git repository or not; nested repos are found too). For each one it checks:
+
+- **Malware**: the confirmed-malware engine on every file (always on, even for ignored paths)
+- **Git backdoors**: unknown hooks in `.git/hooks`, and `core.fsmonitor`, `core.hooksPath`, `core.sshCommand`, filter drivers, `diff.external`, `!` aliases, repo-local credential helpers, which run code during normal git commands
+- **IDE auto-run**: `.vscode` / `.idea` tasks and settings
+- **Exposed secrets**: keys and tokens in code, and `.env` files that git tracks (masked in the output)
+- **Dangerous files**: executables, disguised double extensions
+
+When it finishes you get, for every project, what was found, what was **removed** (and how: whole file quarantined, or malware cut out and the rest kept), and what still needs your attention with the exact command to fix it, followed by a table:
+
+```text
+Results per project
+  Project        Status    Found   Removed   To review
+  shop-backend   CLEANED   8       8         0
+  admin-panel    DANGER    2       0         2
+  mobile-app     SECRETS   3       0         3
+  landing        CLEAN     0       0         0
+```
+
+A JSON report is saved to `~/.gitsafty/reports/`. Only confirmed malware is ever removed (with backups); backdoors and secrets are reported with a fix command. Use `.gitsafetyrc.json` `ignoreFiles` for known test fixtures.
+
+---
+
+## 🩺 Troubleshooting (`doctor`)
+
+Something not working? One command finds out what and prints the exact fix:
+
+```bash
+gitsafty doctor          # report
+gitsafty doctor --fix    # apply the safe fixes (rewrite hooks, re-register the vault helper)
+```
+
+It checks Node.js, git, the global hooks (missing, outdated, or pointing to a GitSafty that was uninstalled or moved), and the GitHub login helper (e.g. it points to a Node.js version that nvm removed). Every GitSafty error also ends with a "💡 What to do" hint, and if GitSafty itself is gone, every `git clone` / `git pull` / `git push` prints how to reinstall or turn it off.
+
+**Can't install or update?**
+
+| npm error | Fix |
+|---|---|
+| `EACCES` / permission denied | Use a user-owned npm folder: `mkdir -p ~/.npm-global && npm config set prefix ~/.npm-global`, add `~/.npm-global/bin` to `PATH`, install again (Windows: run as Administrator or use nvm-windows) |
+| `ENOTFOUND` / `ETIMEDOUT` | Network/proxy: `npm config get registry`, `npm cache verify`, try again |
+| `Unexpected token` / engine warning | Node.js too old: install Node 18+ (`nvm install --lts`) |
+
+**Turn GitSafty off without the CLI** (works even when it can't be installed):
+
+```bash
+git config --global --unset core.hooksPath
+rm -rf ~/.git-hooks-safty                                   # Windows PowerShell: Remove-Item -Recurse -Force "$HOME\.git-hooks-safty"
+git config --global --remove-section credential.https://github.com   # only if you used the vault
+```
+
+---
+
 ## 🛠️ CLI Command Reference
 
 | Command | Description |
@@ -222,6 +289,8 @@ Limits, honestly: the chip stops token theft (copying files, Keychain or browser
 | `npx @arifbiswas/git-pre-push clean` | Unstages and quarantines injected malware files to `.git/git-safty-quarantine/` |
 | `npx @arifbiswas/git-pre-push demo` | Simulates a blocked push in terminal |
 | `npx @arifbiswas/git-pre-push action` | Generates a `.github/workflows/git-safty.yml` CI workflow |
+| `npx @arifbiswas/git-pre-push scan-projects <folder>` | **Advanced Scanner**: audit every project in a folder (malware, git backdoors, IDE, secrets) |
+| `npx @arifbiswas/git-pre-push doctor [--fix]` | Finds broken/outdated installs and shows (or applies) the exact fix |
 | `npx @arifbiswas/git-pre-push uninstall` | Cleanly removes the hook from `.git/hooks` |
 
 ---

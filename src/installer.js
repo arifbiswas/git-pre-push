@@ -34,6 +34,22 @@ run_gitsafty() {
   done
   return 127
 }
+
+# Shown when GitSafty itself can't be found, so git never fails silently.
+gitsafty_missing() {
+  HOOK_DIR=$(cd "$(dirname "$0")" 2>/dev/null && pwd)
+  echo "" >&2
+  echo "⚠  GitSafty is not reachable (\$GITSAFTY_CLI is missing and no gitsafty command on PATH)." >&2
+  echo "   git still runs GitSafty's hooks, so protection is OFF until you fix this:" >&2
+  echo "   Reinstall:     npm install -g @arifbiswas/git-pre-push && gitsafty init --global" >&2
+  case "$HOOK_DIR" in
+    *.git-hooks-safty)
+      echo "   Or turn off:   git config --global --unset core.hooksPath && rm -rf ~/.git-hooks-safty" >&2 ;;
+    *)
+      echo "   Or turn off:   rm \\"$HOOK_DIR/pre-push\\" \\"$HOOK_DIR/post-checkout\\" \\"$HOOK_DIR/post-merge\\"" >&2 ;;
+  esac
+  echo "" >&2
+}
 `;
 }
 
@@ -42,6 +58,7 @@ function prePushBody() {
   run_gitsafty scan-push "$@"
   rc=$?
   if [ $rc -ne 127 ]; then return $rc; fi
+  gitsafty_missing
 
   # 3. Published package via bunx / npx
   if command -v bunx >/dev/null 2>&1; then
@@ -99,6 +116,7 @@ function postHookBody(hookType) {
 # malware. Never fails the git command itself.
 run_gitsafty ${command} "$@"
 if [ $? -eq 127 ]; then
+  gitsafty_missing
   # Fallback: GitSafty not reachable, at least warn about the known loader marker.
   HITS=$(git grep -l -I -E 'global\\[.!.\\]=.[0-9-]+.;(var|\\(function)' 2>/dev/null | head -20)
   if [ -n "$HITS" ]; then
