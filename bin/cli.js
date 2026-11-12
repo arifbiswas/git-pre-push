@@ -258,7 +258,7 @@ async function main() {
       banner();
       console.log(`
 ${colors.bold}Usage:${colors.reset}
-  npx git-safty <command>
+  npx @arifbiswas/git-pre-push <command>
 
 ${colors.bold}Commands:${colors.reset}
   ${colors.green}init${colors.reset}         Protect this repo (push + checkout + pull). ${colors.green}init --global${colors.reset}: every repo on this PC
@@ -282,14 +282,14 @@ ${colors.bold}Commands:${colors.reset}
   ${colors.green}uninstall${colors.reset}    Remove hooks from this repo (outside a repo, or with --global: remove global hooks)
 
 ${colors.bold}How it works:${colors.reset}
-  1. Run ${colors.cyan}npx git-safty init${colors.reset} in any git repository.
+  1. Run ${colors.cyan}npx @arifbiswas/git-pre-push init${colors.reset} in any git repository.
   2. Whenever you run ${colors.cyan}git push${colors.reset}, GitSafty automatically intercepts and scans:
      - Outgoing modified files for blacklisted & trojan scripts (temp_auto_push.bat, .vbs, .ps1, .exe, etc.)
      - Outgoing diff content for obfuscated payloads (base64 eval, powershell cradles, curl | bash, lolbins)
      - IDE settings (.vscode/tasks.json, .vscode/settings.json, JetBrains configs)
      - Leaked API keys, private keys, and .env files
   3. If malware or critical secrets are detected, ${colors.red}${colors.bold}the push is rejected immediately${colors.reset}!
-  4. With ${colors.cyan}npx git-safty init --global${colors.reset}, every ${colors.cyan}git clone${colors.reset} / ${colors.cyan}git pull${colors.reset} on this device is scanned too.
+  4. With ${colors.cyan}npx @arifbiswas/git-pre-push init --global${colors.reset}, every ${colors.cyan}git clone${colors.reset} / ${colors.cyan}git pull${colors.reset} on this device is scanned too.
      ${colors.bold}Confirmed${colors.reset} malware is removed automatically (backup kept in .git/gitsafty-quarantine/).
      ${colors.bold}Suspicious${colors.reset} items are only reported, never touched.
      Disable auto-removal with ${colors.cyan}"autoClean": false${colors.reset} in .gitsafetyrc.json or GITSAFTY_NO_AUTOCLEAN=1.
