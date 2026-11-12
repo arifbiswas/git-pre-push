@@ -100,7 +100,9 @@ Enter your choice (1-16, 0 to exit):
 
 ---
 
-**Updates:** every time you open `gitsafty` it checks npm. When a new version is out it asks `Install GitSafty x.y.z now? (Y/n)`; answer `y` and it installs and reopens the new version (global installs only; never inside git hooks or CI). Turn the question off with `GITSAFTY_NO_UPDATE_PROMPT=1`.
+**Updates:** npm 11+ may print `install scripts not yet covered by allowScripts` after `npm install -g`. The update itself worked; only GitSafty's postinstall step was skipped. That is fine: the next time any `gitsafty` command or git hook runs, GitSafty brings your global hooks and the pull-scan shell function up to date by itself (only from a real global install, never from npx or a source checkout).
+
+Every time you open `gitsafty` it checks npm. When a new version is out it asks `Install GitSafty x.y.z now? (Y/n)`; answer `y` and it installs and reopens the new version (global installs only; never inside git hooks or CI). Turn the question off with `GITSAFTY_NO_UPDATE_PROMPT=1`.
 
 ### Option 3: Lock Down an Entire Machine (Global Protection)
 

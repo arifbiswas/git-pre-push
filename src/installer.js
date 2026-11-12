@@ -339,9 +339,57 @@ function refreshInstalledHooks() {
   return null;
 }
 
+/**
+ * True when this copy of GitSafty is a real global npm install (not an npx
+ * cache, a project dependency or a source checkout). Only such a copy may
+ * take over hooks / shell functions that point somewhere else.
+ */
+function isPermanentGlobalInstall(cli = CLI_PATH) {
+  return /\/node_modules\/@arifbiswas\/git-pre-push\/bin\/cli\.js$/.test(cli) &&
+    !/\/_npx\//.test(cli) &&
+    !/\/node_modules\/.+\/node_modules\//.test(cli) &&
+    /\/lib\/node_modules\/|\/npm\/node_modules\/|\/nodejs\/node_modules\/|^[A-Za-z]:\/.*\/node_modules\//.test(cli);
+}
+
+/**
+ * Brings the global hooks up to date with THIS version, but only the ones
+ * that differ. Runs on every GitSafty command, because newer npm versions
+ * block install scripts (postinstall), so an update alone can't refresh them.
+ * @returns {string[]} hook types that were rewritten (empty when up to date)
+ */
+function refreshOutdatedHooks() {
+  const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+  const globalDir = path.join(homeDir, '.git-hooks-safty');
+  const updated = [];
+  try {
+    const prePush = path.join(globalDir, 'pre-push');
+    if (!fs.existsSync(prePush)) return updated;
+    const prePushText = fs.readFileSync(prePush, 'utf8');
+    if (!prePushText.includes(HOOK_MARKER)) return updated;
+
+    // Only touch hooks that already belong to this copy, or move them to this
+    // copy when it is a real global npm install. Never point them at an npx
+    // cache or a source checkout someone happens to run.
+    const m = prePushText.match(/^GITSAFTY_CLI='([^']*)'/m);
+    const hookCli = m ? m[1] : null;
+    if (hookCli !== CLI_PATH && !isPermanentGlobalInstall()) return updated;
+
+    for (const type of HOOK_TYPES) {
+      const file = path.join(globalDir, type);
+      const current = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+      if (current.includes(generateHookContent(type).trim())) continue;
+      writeHook(globalDir, type);
+      updated.push(type);
+    }
+  } catch (_) {}
+  return updated;
+}
+
 module.exports = {
   installHook,
   uninstallHook,
+  refreshOutdatedHooks,
+  isPermanentGlobalInstall,
   uninstallGlobalHook,
   refreshInstalledHooks,
   generateHookContent,
