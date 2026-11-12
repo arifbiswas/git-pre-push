@@ -228,7 +228,9 @@ async function main() {
       if (result.success) {
         console.log(`\n${colors.green}${colors.bold}✔ ${result.message}${colors.reset}\n`);
         console.log(`${colors.cyan}Your git environment is now protected!${colors.reset}`);
-        console.log(`${colors.dim}Every 'git push' will automatically scan outgoing commits for malware & secret leaks.${colors.reset}\n`);
+        console.log(`${colors.dim}Every git push, clone and pull${isGlobalFlag ? ' on this PC' : ' in this repository'} is scanned for malware & secret leaks.${colors.reset}\n`);
+        const { offerPermanentInstall } = require('../src/updateNotifier');
+        await offerPermanentInstall(['init', ...(isGlobalFlag ? ['--global'] : [])]);
       } else {
         console.error(`\n${colors.red}${colors.bold}✖ ${result.message}${colors.reset}\n`);
         process.exit(1);
@@ -256,10 +258,10 @@ async function main() {
       banner();
       console.log(`
 ${colors.bold}Usage:${colors.reset}
-  npx git-safty <command>
+  npx @arifbiswas/git-pre-push <command>
 
 ${colors.bold}Commands:${colors.reset}
-  ${colors.green}init${colors.reset}         Install the pre-push guard hook into .git/hooks/pre-push
+  ${colors.green}init${colors.reset}         Protect this repo (push + checkout + pull). ${colors.green}init --global${colors.reset}: every repo on this PC
   ${colors.green}scan${colors.reset}         Scan current local repository, staged files & working tree
   ${colors.green}scan-remote${colors.reset}  Scan remote GitHub repository without downloading or cloning
   ${colors.green}clean${colors.reset}        Quarantine injected malware scripts (.bat, .ps1, trojans)
@@ -273,17 +275,21 @@ ${colors.bold}Commands:${colors.reset}
   ${colors.green}vault status${colors.reset} Show vault / credential helper / SSH key protection status
   ${colors.green}vault test${colors.reset}   Try one unlock (prompt) without using the token
   ${colors.green}vault remove${colors.reset} Turn the vault off and go back to normal git login
+  ${colors.green}scan-projects${colors.reset} <folder>  Advanced Scanner: audit EVERY project in a folder at once
+               (malware, git backdoors, IDE auto-run, secrets) [--clean] [--deep] [--json]
+  ${colors.green}doctor${colors.reset}       Find broken/outdated installs and show the exact fix (--fix applies it)
+  ${colors.green}update${colors.reset}       Check npm for a new version and install it
   ${colors.green}uninstall${colors.reset}    Remove hooks from this repo (outside a repo, or with --global: remove global hooks)
 
 ${colors.bold}How it works:${colors.reset}
-  1. Run ${colors.cyan}npx git-safty init${colors.reset} in any git repository.
+  1. Run ${colors.cyan}npx @arifbiswas/git-pre-push init${colors.reset} in any git repository.
   2. Whenever you run ${colors.cyan}git push${colors.reset}, GitSafty automatically intercepts and scans:
      - Outgoing modified files for blacklisted & trojan scripts (temp_auto_push.bat, .vbs, .ps1, .exe, etc.)
      - Outgoing diff content for obfuscated payloads (base64 eval, powershell cradles, curl | bash, lolbins)
      - IDE settings (.vscode/tasks.json, .vscode/settings.json, JetBrains configs)
      - Leaked API keys, private keys, and .env files
   3. If malware or critical secrets are detected, ${colors.red}${colors.bold}the push is rejected immediately${colors.reset}!
-  4. With ${colors.cyan}npx git-safty init --global${colors.reset}, every ${colors.cyan}git clone${colors.reset} / ${colors.cyan}git pull${colors.reset} on this device is scanned too.
+  4. With ${colors.cyan}npx @arifbiswas/git-pre-push init --global${colors.reset}, every ${colors.cyan}git clone${colors.reset} / ${colors.cyan}git pull${colors.reset} on this device is scanned too.
      ${colors.bold}Confirmed${colors.reset} malware is removed automatically (backup kept in .git/gitsafty-quarantine/).
      ${colors.bold}Suspicious${colors.reset} items are only reported, never touched.
      Disable auto-removal with ${colors.cyan}"autoClean": false${colors.reset} in .gitsafetyrc.json or GITSAFTY_NO_AUTOCLEAN=1.
