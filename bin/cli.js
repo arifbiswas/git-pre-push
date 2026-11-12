@@ -49,6 +49,7 @@ async function main() {
         runPostCheckout(args[1], args[2], args[3]);
       } catch (err) {
         console.error(`[GitSafty] clone/checkout scan error: ${err.message}`);
+        try { require('../src/doctor').printHint(err); } catch (_) {}
       }
       process.exit(0);
       break;
@@ -59,6 +60,7 @@ async function main() {
         runPostMerge();
       } catch (err) {
         console.error(`[GitSafty] pull scan error: ${err.message}`);
+        try { require('../src/doctor').printHint(err); } catch (_) {}
       }
       process.exit(0);
       break;
@@ -82,6 +84,14 @@ async function main() {
         passphrase: args.includes('--passphrase')
       });
       if (code) process.exit(code);
+      break;
+    }
+
+    case 'doctor':
+    case 'fix-install': {
+      banner();
+      const { runDoctor } = require('../src/doctor');
+      process.exit(runDoctor({ fix: args.includes('--fix') }));
       break;
     }
 
@@ -137,6 +147,7 @@ async function main() {
         }
       } catch (err) {
         console.error(`\n${colors.red}${colors.bold}✖ Scan Failed:${colors.reset} ${err.message}\n`);
+        require('../src/doctor').printHint(err);
         process.exit(1);
       }
       break;
@@ -246,6 +257,7 @@ ${colors.bold}Commands:${colors.reset}
   ${colors.green}vault status${colors.reset} Show vault / credential helper / SSH key protection status
   ${colors.green}vault test${colors.reset}   Try one unlock (prompt) without using the token
   ${colors.green}vault remove${colors.reset} Turn the vault off and go back to normal git login
+  ${colors.green}doctor${colors.reset}       Find broken/outdated installs and show the exact fix (--fix applies it)
   ${colors.green}uninstall${colors.reset}    Remove hooks from this repo (outside a repo, or with --global: remove global hooks)
 
 ${colors.bold}How it works:${colors.reset}
@@ -268,7 +280,8 @@ ${colors.bold}Zero Dependencies:${colors.reset} 100% pure Node.js built-ins.
 }
 
 main().catch((err) => {
-  console.error(`[git-safty error]:`, err);
+  console.error(`${colors.red}${colors.bold}✖ GitSafty error:${colors.reset} ${err && err.message ? err.message : err}`);
+  try { require('../src/doctor').printHint(err); } catch (_) {}
   process.exit(1);
 });
 

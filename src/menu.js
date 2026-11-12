@@ -52,6 +52,7 @@ async function runInteractiveMenu() {
   item(6, '⚡', 'Run Push Intercept Demo', 'Simulate a blocked malware push');
   item(7, '🤖', 'Setup GitHub Action CI', 'Guard repository on GitHub server-side');
   item(9, '🔄', 'Check for Updates', 'Check if a new version is available on npm');
+  item(15, '🩺', 'Doctor', 'Something broken? Find it and show/apply the fix');
   console.log(`  ${colors.dim}[0]  🚪  Exit${colors.reset}\n`);
 
   const rl = readline.createInterface({
@@ -60,7 +61,7 @@ async function runInteractiveMenu() {
   });
 
   const choice = await new Promise((resolve) => {
-    rl.question(`${colors.bold}${colors.yellow}Enter your choice (1-14, 0 to exit): ${colors.reset}`, (ans) => {
+    rl.question(`${colors.bold}${colors.yellow}Enter your choice (1-15, 0 to exit): ${colors.reset}`, (ans) => {
       rl.close();
       resolve(ans.trim());
     });
@@ -216,6 +217,17 @@ async function runInteractiveMenu() {
         await runVaultCommand('remove');
       } else {
         console.log(`${colors.dim}Vault kept.${colors.reset}\n`);
+      }
+      break;
+    }
+
+    case '15': {
+      const { runDoctor, runChecks } = require('./doctor');
+      runDoctor();
+      const fixable = runChecks().some(c => c.fix && c.level !== 'ok');
+      if (fixable) {
+        const fixIt = await ask(`${colors.bold}${colors.cyan}? Apply the safe fixes now? (y/N): ${colors.reset}`);
+        if (/^y(es)?$/i.test(fixIt)) runDoctor({ fix: true });
       }
       break;
     }

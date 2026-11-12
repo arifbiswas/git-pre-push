@@ -65,7 +65,7 @@ Select an action to perform:
   ── Protection ──
   [1]  🛡️   Install Local Hook       - Protect current repo (push + checkout + pull)
   [2]  🌐  Install Global Hook      - Protect EVERY repo on this PC: scan on clone, pull & push
-  [8]  ❌  Uninstall Hook           - Remove GitSafty hooks
+  [8]  ❌  Uninstall Hook           - Remove GitSafty hooks (this repo or whole PC)
 
   ── Malware scan & removal ──
   [3]  🔍  Scan Local Workspace     - Deep scan this repo, auto-remove confirmed malware
@@ -83,9 +83,10 @@ Select an action to perform:
   [6]  ⚡  Run Push Intercept Demo  - Simulate a blocked malware push
   [7]  🤖  Setup GitHub Action CI   - Guard repository on GitHub server-side
   [9]  🔄  Check for Updates        - Check if a new version is available on npm
+  [15] 🩺  Doctor                   - Something broken? Find it and show/apply the fix
   [0]  🚪  Exit
 
-Enter your choice (1-14, 0 to exit):
+Enter your choice (1-15, 0 to exit):
 ```
 
 ---
@@ -209,6 +210,35 @@ Limits, honestly: the chip stops token theft (copying files, Keychain or browser
 
 ---
 
+## 🩺 Troubleshooting (`doctor`)
+
+Something not working? One command finds out what and prints the exact fix:
+
+```bash
+gitsafty doctor          # report
+gitsafty doctor --fix    # apply the safe fixes (rewrite hooks, re-register the vault helper)
+```
+
+It checks Node.js, git, the global hooks (missing, outdated, or pointing to a GitSafty that was uninstalled or moved), and the GitHub login helper (e.g. it points to a Node.js version that nvm removed). Every GitSafty error also ends with a "💡 What to do" hint, and if GitSafty itself is gone, every `git clone` / `git pull` / `git push` prints how to reinstall or turn it off.
+
+**Can't install or update?**
+
+| npm error | Fix |
+|---|---|
+| `EACCES` / permission denied | Use a user-owned npm folder: `mkdir -p ~/.npm-global && npm config set prefix ~/.npm-global`, add `~/.npm-global/bin` to `PATH`, install again (Windows: run as Administrator or use nvm-windows) |
+| `ENOTFOUND` / `ETIMEDOUT` | Network/proxy: `npm config get registry`, `npm cache verify`, try again |
+| `Unexpected token` / engine warning | Node.js too old: install Node 18+ (`nvm install --lts`) |
+
+**Turn GitSafty off without the CLI** (works even when it can't be installed):
+
+```bash
+git config --global --unset core.hooksPath
+rm -rf ~/.git-hooks-safty                                   # Windows PowerShell: Remove-Item -Recurse -Force "$HOME\.git-hooks-safty"
+git config --global --remove-section credential.https://github.com   # only if you used the vault
+```
+
+---
+
 ## 🛠️ CLI Command Reference
 
 | Command | Description |
@@ -222,6 +252,7 @@ Limits, honestly: the chip stops token theft (copying files, Keychain or browser
 | `npx @arifbiswas/git-pre-push clean` | Unstages and quarantines injected malware files to `.git/git-safty-quarantine/` |
 | `npx @arifbiswas/git-pre-push demo` | Simulates a blocked push in terminal |
 | `npx @arifbiswas/git-pre-push action` | Generates a `.github/workflows/git-safty.yml` CI workflow |
+| `npx @arifbiswas/git-pre-push doctor [--fix]` | Finds broken/outdated installs and shows (or applies) the exact fix |
 | `npx @arifbiswas/git-pre-push uninstall` | Cleanly removes the hook from `.git/hooks` |
 
 ---
