@@ -1,6 +1,6 @@
 {
   "name": "@arifbiswas/git-pre-push",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "description": "Zero-dependency pre-push security guard that stops malware, injected scripts, and leaked secrets from reaching GitHub.",
   "main": "src/index.js",
   "bin": {
