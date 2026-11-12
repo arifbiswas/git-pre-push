@@ -212,7 +212,7 @@ async function main() {
     case 'uninstall':
     case 'remove': {
       banner();
-      const result = uninstallHook();
+      const result = uninstallHook(process.cwd(), isGlobalFlag);
       if (result.success) {
         console.log(`\n${colors.yellow}${colors.bold}✔ ${result.message}${colors.reset}\n`);
       } else {
@@ -246,7 +246,7 @@ ${colors.bold}Commands:${colors.reset}
   ${colors.green}vault status${colors.reset} Show vault / credential helper / SSH key protection status
   ${colors.green}vault test${colors.reset}   Try one unlock (prompt) without using the token
   ${colors.green}vault remove${colors.reset} Turn the vault off and go back to normal git login
-  ${colors.green}uninstall${colors.reset}    Remove git-safty hook from .git/hooks
+  ${colors.green}uninstall${colors.reset}    Remove hooks from this repo (outside a repo, or with --global: remove global hooks)
 
 ${colors.bold}How it works:${colors.reset}
   1. Run ${colors.cyan}npx git-safty init${colors.reset} in any git repository.

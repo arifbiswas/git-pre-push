@@ -34,7 +34,7 @@ async function runInteractiveMenu() {
   section('Protection');
   item(1, '🛡️ ', 'Install Local Hook', 'Protect current repo (push + checkout + pull)');
   item(2, '🌐', 'Install Global Hook', 'Protect EVERY repo on this PC: scan on clone, pull & push');
-  item(8, '❌', 'Uninstall Hook', 'Remove GitSafty hooks');
+  item(8, '❌', 'Uninstall Hook', 'Remove GitSafty hooks (this repo or whole PC)');
 
   section('Malware scan & removal');
   item(3, '🔍', 'Scan Local Workspace', 'Deep scan this repo, auto-remove confirmed malware');
@@ -166,7 +166,13 @@ async function runInteractiveMenu() {
     }
 
     case '8': {
-      const res = uninstallHook();
+      const { isGitRepo } = require('./utils/git');
+      let global = !isGitRepo(process.cwd());
+      if (!global) {
+        const scope = await ask(`\n${colors.bold}${colors.cyan}? Remove hooks from (1) this repository only, or (2) the whole PC (global)? [1/2]: ${colors.reset}`);
+        global = scope === '2';
+      }
+      const res = uninstallHook(process.cwd(), global);
       if (res.success) {
         console.log(`\n${colors.yellow}${colors.bold}✔ ${res.message}${colors.reset}\n`);
       } else {
