@@ -5,43 +5,44 @@ const { getHooksDir, isGitRepo } = require('./utils/git');
 const HOOK_MARKER = '# --- GIT-SAFTY SECURITY HOOK START ---';
 const HOOK_END_MARKER = '# --- GIT-SAFTY SECURITY HOOK END ---';
 
-function generateHookContent() {
-  return `${HOOK_MARKER}
-# GitSafty: Automatic Pre-Push Malware & Secret Guard
-# Prevents unauthorized scripts, Trojans, and secret leaks from reaching remote repositories.
+const HOOK_TYPES = ['pre-push', 'post-checkout', 'post-merge'];
 
-run_scanner() {
-  # 1. Try local node_modules
-  if [ -f "./node_modules/@arifbiswas/git-pre-push/bin/cli.js" ]; then
-    node "./node_modules/@arifbiswas/git-pre-push/bin/cli.js" scan-push "$@"
-    return $?
-  fi
-  if [ -f "./node_modules/git-pre-push/bin/cli.js" ]; then
-    node "./node_modules/git-pre-push/bin/cli.js" scan-push "$@"
-    return $?
-  fi
-  if [ -f "./node_modules/git-safty/bin/cli.js" ]; then
-    node "./node_modules/git-safty/bin/cli.js" scan-push "$@"
-    return $?
-  fi
+// Absolute path of this installation's CLI, baked into the hook so a cloned
+// repository can never substitute its own ./bin/cli.js or node_modules copy.
+const CLI_PATH = path.resolve(__dirname, '..', 'bin', 'cli.js');
 
-  # 2. Try repository local bin
-  if [ -f "./bin/cli.js" ]; then
-    node "./bin/cli.js" scan-push "$@"
-    return $?
-  fi
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
 
-  # 3. Try global commands if in PATH
-  if command -v git-pre-push >/dev/null 2>&1; then
-    git-pre-push scan-push "$@"
-    return $?
-  fi
-  if command -v git-safty >/dev/null 2>&1; then
-    git-safty scan-push "$@"
-    return $?
-  fi
+function runnerFunction() {
+  return `GITSAFTY_CLI=${shellQuote(CLI_PATH)}
 
-  # 4. Try bunx or npx with published package @arifbiswas/git-pre-push
+run_gitsafty() {
+  # 1. The exact GitSafty installation that installed this hook
+  if [ -f "$GITSAFTY_CLI" ] && command -v node >/dev/null 2>&1; then
+    node "$GITSAFTY_CLI" "$@"
+    return $?
+  fi
+  # 2. Globally installed command
+  for c in gitsafty git-safty git-pre-push; do
+    if command -v "$c" >/dev/null 2>&1; then
+      "$c" "$@"
+      return $?
+    fi
+  done
+  return 127
+}
+`;
+}
+
+function prePushBody() {
+  return `run_scanner() {
+  run_gitsafty scan-push "$@"
+  rc=$?
+  if [ $rc -ne 127 ]; then return $rc; fi
+
+  # 3. Published package via bunx / npx
   if command -v bunx >/dev/null 2>&1; then
     bunx --yes @arifbiswas/git-pre-push scan-push "$@" 2>/dev/null
     if [ $? -eq 0 ]; then return 0; fi
@@ -51,11 +52,11 @@ run_scanner() {
     if [ $? -eq 0 ]; then return 0; fi
   fi
 
-  # 5. Shell Fallback Guard (if Node/package is not available in current subshell)
+  # 4. Shell Fallback Guard (if Node/package is not available in current subshell)
   echo "[GitSafty Fallback] Scanning push payload..."
   ZERO_OID="0000000000000000000000000000000000000000"
   SUSPICIOUS_FILES="temp_auto_push\\.bat|temp_interactive_push\\.bat|config\\.bat|autorun\\.bat|hidden_push\\.sh|.*\\.exe$|.*\\.vbs$|.*\\.ps1$|.*\\.scr$"
-  SUSPICIOUS_PAYLOAD="powershell.*-enc|curl.*\\|.*bash|eval\\(base64_decode|cmd\\.exe.*\\/c"
+  SUSPICIOUS_PAYLOAD="powershell.*-enc|curl.*\\|.*bash|eval\\(base64_decode|cmd\\.exe.*\\/c|global\\[.!.\\]=.[0-9-]+.;(var|\\(function)"
 
   while read local_ref local_oid remote_ref remote_oid; do
     if [ "$local_oid" = "$ZERO_OID" ]; then continue; fi
@@ -88,9 +89,60 @@ EXIT_CODE=$?
 
 if [ $EXIT_CODE -ne 0 ]; then
   exit 1
+fi`;
+}
+
+function postHookBody(hookType) {
+  const command = hookType === 'post-checkout' ? 'scan-checkout' : 'scan-merge';
+  return `# Runs after git clone / checkout / pull. Reports and removes confirmed
+# malware. Never fails the git command itself.
+run_gitsafty ${command} "$@"
+if [ $? -eq 127 ]; then
+  # Fallback: GitSafty not reachable, at least warn about the known loader marker.
+  HITS=$(git grep -l -I -E 'global\\[.!.\\]=.[0-9-]+.;(var|\\(function)' 2>/dev/null | head -20)
+  if [ -n "$HITS" ]; then
+    echo "\\033[0;31m[GitSafty Fallback] MALWARE marker found. Do NOT open this folder in an IDE:\\033[0m"
+    echo "$HITS"
+  fi
 fi
+exit 0`;
+}
+
+function generateHookContent(hookType = 'pre-push') {
+  const body = hookType === 'pre-push' ? prePushBody() : postHookBody(hookType);
+  return `${HOOK_MARKER}
+# GitSafty: Malware & Secret Guard (${hookType})
+# Scans pushed commits, cloned repositories and pulled changes for malware.
+
+${runnerFunction()}
+${body}
 ${HOOK_END_MARKER}
 `;
+}
+
+function writeHook(hooksDir, hookType) {
+  const hookPath = path.join(hooksDir, hookType);
+  const newHookBlock = generateHookContent(hookType);
+
+  let finalContent = '';
+  if (fs.existsSync(hookPath)) {
+    // Make writable if previously locked
+    try { fs.chmodSync(hookPath, 0o755); } catch (_) {}
+
+    const existing = fs.readFileSync(hookPath, 'utf8');
+    if (existing.includes(HOOK_MARKER)) {
+      const regex = new RegExp(`${HOOK_MARKER}[\\s\\S]*?${HOOK_END_MARKER}`, 'm');
+      finalContent = existing.replace(regex, () => newHookBlock.trim());
+    } else {
+      finalContent = existing.trim() + '\n\n' + newHookBlock;
+    }
+  } else {
+    finalContent = '#!/bin/sh\n' + newHookBlock;
+  }
+
+  fs.writeFileSync(hookPath, finalContent, { mode: 0o755 });
+  try { fs.chmodSync(hookPath, 0o755); } catch (_) {}
+  return hookPath;
 }
 
 /**
@@ -133,35 +185,13 @@ function installHook(cwd = process.cwd(), isGlobal = false) {
       fs.mkdirSync(hooksDir, { recursive: true });
     }
 
-    const hookPath = path.join(hooksDir, 'pre-push');
-    const newHookBlock = generateHookContent();
-
-    let finalContent = '';
-    if (fs.existsSync(hookPath)) {
-      // Make writable if previously locked
-      try { fs.chmodSync(hookPath, 0o755); } catch (_) {}
-
-      const existing = fs.readFileSync(hookPath, 'utf8');
-      if (existing.includes(HOOK_MARKER)) {
-        const regex = new RegExp(`${HOOK_MARKER}[\\s\\S]*?${HOOK_END_MARKER}`, 'm');
-        finalContent = existing.replace(regex, newHookBlock.trim());
-      } else {
-        finalContent = existing.trim() + '\n\n' + newHookBlock;
-      }
-    } else {
-      finalContent = '#!/bin/sh\n' + newHookBlock;
-    }
-
-    fs.writeFileSync(hookPath, finalContent, { mode: 0o755 });
-    try {
-      // Executable permission
-      fs.chmodSync(hookPath, 0o755);
-    } catch (_) {}
+    const written = HOOK_TYPES.map(type => writeHook(hooksDir, type));
+    const hookPath = written[0];
 
     const typeMsg = isGlobal ? 'GLOBAL Git hook for ALL repositories on this PC' : 'local pre-push hook';
     return {
       success: true,
-      message: `Successfully installed GitSafty ${typeMsg} at: ${hookPath}`
+      message: `Successfully installed GitSafty ${typeMsg} (pre-push, post-checkout, post-merge) at: ${path.dirname(hookPath)}`
     };
   } catch (err) {
     return {
@@ -182,36 +212,55 @@ function uninstallHook(cwd = process.cwd()) {
     return { success: false, message: 'Git hooks directory not found.' };
   }
 
-  const hookPath = path.join(hooksDir, 'pre-push');
-  if (!fs.existsSync(hookPath)) {
-    return { success: true, message: 'Hook was not installed.' };
-  }
-
+  let removed = 0;
   try {
-    const existing = fs.readFileSync(hookPath, 'utf8');
-    if (!existing.includes(HOOK_MARKER)) {
-      return { success: true, message: 'GitSafty hook not present in pre-push file.' };
+    for (const type of HOOK_TYPES) {
+      const hookPath = path.join(hooksDir, type);
+      if (!fs.existsSync(hookPath)) continue;
+      const existing = fs.readFileSync(hookPath, 'utf8');
+      if (!existing.includes(HOOK_MARKER)) continue;
+
+      const regex = new RegExp(`${HOOK_MARKER}[\\s\\S]*?${HOOK_END_MARKER}\\n?`, 'm');
+      const cleaned = existing.replace(regex, '').trim();
+
+      if (cleaned === '' || cleaned === '#!/bin/sh' || cleaned === '#!/usr/bin/env bash') {
+        fs.unlinkSync(hookPath);
+      } else {
+        fs.writeFileSync(hookPath, cleaned + '\n', { mode: 0o755 });
+      }
+      removed++;
     }
-
-    const regex = new RegExp(`${HOOK_MARKER}[\\s\\S]*?${HOOK_END_MARKER}\\n?`, 'm');
-    const cleaned = existing.replace(regex, '').trim();
-
-    if (cleaned === '' || cleaned === '#!/bin/sh' || cleaned === '#!/usr/bin/env bash') {
-      fs.unlinkSync(hookPath);
-    } else {
-      fs.writeFileSync(hookPath, cleaned + '\n', { mode: 0o755 });
-    }
-
-    return { success: true, message: 'GitSafty pre-push hook removed successfully.' };
   } catch (err) {
     return { success: false, message: `Failed to uninstall hook: ${err.message}` };
   }
+
+  if (!removed) return { success: true, message: 'GitSafty hook not present.' };
+  return { success: true, message: `GitSafty hooks removed successfully (${removed}).` };
+}
+
+/**
+ * Re-writes already installed GitSafty hooks with this version's content.
+ * Used after an update so every device gets the new clone/pull protection.
+ */
+function refreshInstalledHooks() {
+  const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+  const globalDir = path.join(homeDir, '.git-hooks-safty');
+  const prePush = path.join(globalDir, 'pre-push');
+  try {
+    if (fs.existsSync(prePush) && fs.readFileSync(prePush, 'utf8').includes(HOOK_MARKER)) {
+      HOOK_TYPES.forEach(type => writeHook(globalDir, type));
+      return globalDir;
+    }
+  } catch (_) {}
+  return null;
 }
 
 module.exports = {
   installHook,
   uninstallHook,
+  refreshInstalledHooks,
   generateHookContent,
+  HOOK_TYPES,
   HOOK_MARKER,
   HOOK_END_MARKER
 };

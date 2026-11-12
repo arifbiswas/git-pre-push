@@ -10,7 +10,9 @@ const DEFAULT_CONFIG = {
   customSuspiciousFiles: [],
   customPayloads: [],
   // Strict mode: Treat warnings as errors
-  strict: false
+  strict: false,
+  // Automatically remove CONFIRMED malware (backups kept in .git/gitsafty-quarantine)
+  autoClean: true
 };
 
 /**
