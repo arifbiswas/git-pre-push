@@ -1,7 +1,16 @@
 #!/usr/bin/env node
 
 const pkg = require('../package.json');
-const { runPrePush, runManualScan, installHook, uninstallHook } = require('../src/index');
+const {
+  runPrePush,
+  runManualScan,
+  runPostCheckout,
+  runPostMerge,
+  runSweep,
+  scanAndCleanRepo,
+  installHook,
+  uninstallHook
+} = require('../src/index');
 const { cleanInfectedFiles } = require('../src/cleaner');
 const { setupGitHubAction } = require('../src/action');
 const { runInteractiveMenu } = require('../src/menu');
@@ -14,7 +23,8 @@ const isGlobalFlag = args.includes('--global') || args.includes('-g');
 
 async function main() {
   // Check for updates non-blocking on interactive commands
-  if (command !== 'scan-push') {
+  const hookCommands = ['scan-push', 'scan-checkout', 'scan-merge', 'credential'];
+  if (!hookCommands.includes(command)) {
     await notifyIfUpdateAvailable(pkg.version);
   }
 
@@ -32,6 +42,88 @@ async function main() {
     case 'scan-push':
       await runPrePush();
       break;
+
+    // Triggered by the post-checkout hook (git clone / checkout / switch)
+    case 'scan-checkout':
+      try {
+        runPostCheckout(args[1], args[2], args[3]);
+      } catch (err) {
+        console.error(`[GitSafty] clone/checkout scan error: ${err.message}`);
+      }
+      process.exit(0);
+      break;
+
+    // Triggered by the post-merge hook (git pull / merge)
+    case 'scan-merge':
+      try {
+        runPostMerge();
+      } catch (err) {
+        console.error(`[GitSafty] pull scan error: ${err.message}`);
+      }
+      process.exit(0);
+      break;
+
+    // git credential helper protocol (stdout belongs to git: print nothing else)
+    case 'credential': {
+      const { runCredentialHelper } = require('../src/vault');
+      let input = '';
+      try { input = require('fs').readFileSync(0, 'utf8'); } catch (_) {}
+      process.exit(runCredentialHelper(args[1], input));
+      break;
+    }
+
+    case 'vault':
+    case 'login-guard': {
+      banner();
+      const vault = require('../src/vault');
+      const sub = (args[1] || 'status').toLowerCase();
+      const hostArg = args.find(a => a.startsWith('--host='));
+      const host = hostArg ? hostArg.slice(7).toLowerCase() : undefined;
+
+      if (sub === 'setup' || sub === 'on' || sub === 'enable') {
+        const res = await vault.setupVault({ host: host || 'github.com', mode: args.includes('--passphrase') ? 'passphrase' : 'auto' });
+        if (!res.success) {
+          console.error(`\n${colors.red}${colors.bold}✖ ${res.message}${colors.reset}\n`);
+          process.exit(1);
+        }
+        console.log(`\n${colors.green}${colors.bold}✔ ${res.message}${colors.reset}`);
+        for (const step of res.steps) console.log(`  ${colors.dim}•${colors.reset} ${step}`);
+        for (const key of res.sshWarnings) {
+          console.log(`\n${colors.yellow}⚠ SSH key without passphrase: ${key}${colors.reset}`);
+          console.log(`  ${colors.dim}Anyone who copies it can push as you. Protect it: ${colors.reset}ssh-keygen -p -f ${key}`);
+        }
+        console.log('');
+      } else if (sub === 'test') {
+        const res = vault.testUnlock();
+        console.log(`\n${res.success ? colors.green + '✔' : colors.red + '✖'} ${res.message}${colors.reset}\n`);
+        if (!res.success) process.exit(1);
+      } else if (sub === 'remove' || sub === 'off' || sub === 'disable') {
+        const res = vault.removeVault({ host });
+        console.log(`\n${colors.yellow}${colors.bold}✔ ${res.message}${colors.reset}\n`);
+      } else {
+        const st = vault.vaultStatus({ host });
+        const ok = (b) => (b ? `${colors.green}✔` : `${colors.red}✖`) + colors.reset;
+        console.log(`\n${colors.bold}GitSafty Vault (${st.host})${colors.reset}`);
+        console.log(`  ${ok(st.vaultExists)} Encrypted token vault ${st.vaultExists ? `(${st.username}, file mode ${st.vaultMode})` : '(not set up: run gitsafty vault setup)'}`);
+        if (st.vaultExists) {
+          const hw = st.protection !== 'passphrase';
+          console.log(`  ${ok(hw)} Locked to this device's security chip ${hw ? `(${st.protection})` : '(passphrase only: run vault setup again on a Mac with Secure Enclave or Windows with Hello)'}`);
+        }
+        if (st.tokenExpiresAt) console.log(`    ${colors.dim}Token expires: ${st.tokenExpiresAt}${colors.reset}`);
+        console.log(`  ${ok(st.helperActive)} GitSafty is git's credential helper for ${st.host}`);
+        console.log(`  ${ok(st.otherHelpers.length === 0)} No other helper can store or hand out a token${st.otherHelpers.length ? `: ${st.otherHelpers.join(', ')}` : ''}`);
+        console.log(`  ${ok(st.sshWarnings.length === 0)} SSH private keys are passphrase-protected${st.sshWarnings.length ? `: ${st.sshWarnings.join(', ')}` : ''}`);
+        console.log('');
+      }
+      break;
+    }
+
+    case 'sweep':
+    case 'scan-all': {
+      const target = args.find((a, i) => i > 0 && !a.startsWith('-')) || process.cwd();
+      process.exit(runSweep(target, { clean: !args.includes('--no-clean') }));
+      break;
+    }
 
     case 'scan':
     case 'check':
@@ -106,6 +198,8 @@ async function main() {
     case 'fix': {
       banner();
       console.log(`${colors.cyan}Scanning workspace for injected malware scripts to quarantine...${colors.reset}`);
+      const { getAllRepoFiles } = require('../src/utils/git');
+      scanAndCleanRepo(getAllRepoFiles(), process.cwd(), { reason: 'clean' });
       const cleanResult = cleanInfectedFiles();
       if (cleanResult.quarantined.length > 0) {
         console.log(`\n${colors.yellow}${colors.bold}⚠ Quarantined ${cleanResult.quarantined.length} malicious file(s):${colors.reset}`);
@@ -177,7 +271,14 @@ ${colors.bold}Commands:${colors.reset}
   ${colors.green}clean${colors.reset}        Quarantine injected malware scripts (.bat, .ps1, trojans)
   ${colors.green}action${colors.reset}       Generate GitHub Actions CI workflow for server-side guard
   ${colors.green}demo${colors.reset}         Run a simulated malicious push test in terminal
+  ${colors.green}sweep${colors.reset} [dir]  Scan EVERY git repo under a folder and remove confirmed malware
   ${colors.green}scan-push${colors.reset}    Triggered automatically by git during 'git push'
+  ${colors.green}scan-checkout${colors.reset} Triggered automatically after 'git clone' / checkout
+  ${colors.green}scan-merge${colors.reset}   Triggered automatically after 'git pull' / merge
+  ${colors.green}vault setup${colors.reset}  Keep this device logged OUT of GitHub: token encrypted, unlocked only per push
+  ${colors.green}vault status${colors.reset} Show vault / credential helper / SSH key protection status
+  ${colors.green}vault test${colors.reset}   Try one unlock (prompt) without using the token
+  ${colors.green}vault remove${colors.reset} Turn the vault off and go back to normal git login
   ${colors.green}uninstall${colors.reset}    Remove git-safty hook from .git/hooks
 
 ${colors.bold}How it works:${colors.reset}
@@ -188,6 +289,10 @@ ${colors.bold}How it works:${colors.reset}
      - IDE settings (.vscode/tasks.json, .vscode/settings.json, JetBrains configs)
      - Leaked API keys, private keys, and .env files
   3. If malware or critical secrets are detected, ${colors.red}${colors.bold}the push is rejected immediately${colors.reset}!
+  4. With ${colors.cyan}npx git-safty init --global${colors.reset}, every ${colors.cyan}git clone${colors.reset} / ${colors.cyan}git pull${colors.reset} on this device is scanned too.
+     ${colors.bold}Confirmed${colors.reset} malware is removed automatically (backup kept in .git/gitsafty-quarantine/).
+     ${colors.bold}Suspicious${colors.reset} items are only reported, never touched.
+     Disable auto-removal with ${colors.cyan}"autoClean": false${colors.reset} in .gitsafetyrc.json or GITSAFTY_NO_AUTOCLEAN=1.
 
 ${colors.bold}Zero Dependencies:${colors.reset} 100% pure Node.js built-ins.
       `);

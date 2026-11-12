@@ -85,7 +85,9 @@ If you suspect your workstation has been compromised, lock down **all Git reposi
 npx @arifbiswas/git-pre-push init --global
 ```
 
-This configures `git config --global core.hooksPath`, ensuring every repository on your PC runs the security scanner before any push.
+This configures `git config --global core.hooksPath`, ensuring every repository on your PC runs the security scanner before any push, **and after every `git clone`, `git checkout` and `git pull`**.
+
+> Already installed globally? Run `init --global` again after updating so the new clone/pull hooks are added.
 
 ---
 
@@ -143,6 +145,55 @@ This configures `git config --global core.hooksPath`, ensuring every repository 
 - Unencrypted production `.env` files being committed
 - Leaked cryptographic private keys (`BEGIN RSA PRIVATE KEY`, `ghp_...`, AWS Access Keys)
 
+### 5. Deep Malware Engine (clone, pull, push)
+Built from real samples of a repository-injection campaign. Every finding gets a verdict:
+
+| Verdict | Meaning | What GitSafty does |
+|---|---|---|
+| **MALWARE** (confirmed) | Proof-level signature that legitimate code never produces | Reports it, backs the file up, **removes it automatically**, re-scans to verify |
+| **SUSPECT** | Dangerous-looking but can be legitimate | Reports only, never touches the file |
+
+Confirmed signatures:
+- Exact SHA-256 of known malware samples
+- `global['!']='9-5756'` loader marker next to an obfuscated decoder
+- Obfuscated payload hidden after 120+ spaces at the end of a normal line (e.g. infected `tailwind.js`). Only the hidden part is cut out, the rest of the file is kept
+- Script disguised as a font or image (`.woff2`, `.ttf`, `.png`, ... whose bytes are JavaScript, not the real format; Git LFS pointers are ignored)
+- `.vscode/tasks.json` task with `runOn: folderOpen` that runs a font/image with `node`/`python`/... or pipes the internet into a shell. Only that task is removed
+- `package.json` install scripts that run a font/image as code
+
+Backups (read-only) and a `report.json` go to `.git/gitsafty-quarantine/<time>/`. Turn auto-removal off with `"autoClean": false` or `GITSAFTY_NO_AUTOCLEAN=1`.
+
+---
+
+## 🔐 Always-Logged-Out Vault (last line of defence)
+
+If a machine might still be compromised, the most valuable thing on it is your GitHub token (macOS Keychain, `~/.git-credentials`, `gh`). The vault makes sure there is **no usable token on the device**:
+
+```bash
+npx @arifbiswas/git-pre-push vault setup
+```
+
+1. You paste a GitHub token once. It is checked with GitHub, then stored **only encrypted** in `~/.gitsafty/vault.json` (mode 600), locked to this device's **security chip**:
+
+   | OS | Protection | Each push asks for |
+   |---|---|---|
+   | macOS (Apple Silicon / T2) | **Secure Enclave** P-256 key (`.userPresence`), ECDH → HKDF-SHA256 → **AES-256-GCM** | Touch ID or Mac password (system dialog) |
+   | Windows 10/11 | **Windows Hello** key in the **TPM**, signature of a random challenge → SHA-256 → HKDF-SHA256 → **AES-256-GCM** | Hello PIN, face or fingerprint |
+   | Linux / no chip | Passphrase → **scrypt** (N=2¹⁷, r=8, p=1) → **AES-256-GCM** | Your vault passphrase |
+
+   The chip key never leaves the chip, so a copied `vault.json` is useless on any other machine, and the system prompt can't be approved by malware. All metadata is bound as GCM additional data, so edits are detected. On macOS a small Swift helper is compiled once on your Mac during setup (needs `xcode-select --install`). Force the passphrase mode with `vault setup --passphrase`.
+2. GitSafty becomes the **only** git credential helper for `github.com`. Other helpers (osxkeychain, Windows Credential Manager, `store`, `gh`) are switched off for GitHub, and saved GitHub logins in the macOS Keychain and `~/.git-credentials` are deleted.
+3. On `git push`, git asks GitSafty for a login. GitSafty shows the chip prompt, decrypts the token **in memory**, gives it to git for that one command and wipes it. Git's "save this login" step is ignored, so after the push the device is **logged out again**.
+4. Every unlock and every refused unlock shows a desktop notification. A prompt or notification for a push you did not start means someone else is on your machine: press Cancel.
+
+```bash
+npx @arifbiswas/git-pre-push vault status   # helper, chip, vault and SSH key checks
+npx @arifbiswas/git-pre-push vault test     # one unlock prompt, token is not used
+npx @arifbiswas/git-pre-push vault remove   # back to normal git login
+```
+
+Limits, honestly: the chip stops token theft (copying files, Keychain or browser stores), which is how stealers work. It can't stop malware that is running while you approve your own push from riding along with that one approved command, and in passphrase mode a keylogger can capture the passphrase. So also use a **fine-grained token with a short expiry and only the repos you need**, and rotate it. SSH remotes do not use git credential helpers: `vault status` warns about SSH private keys without a passphrase (`ssh-keygen -p -f ~/.ssh/id_ed25519`).
+
 ---
 
 ## 🛠️ CLI Command Reference
@@ -153,6 +204,8 @@ This configures `git config --global core.hooksPath`, ensuring every repository 
 | `npx @arifbiswas/git-pre-push init --global` | Protects **all** Git repositories across the entire PC |
 | `npx @arifbiswas/git-pre-push scan` | Manually audits local workspace files, untracked scripts & staged diffs |
 | `npx @arifbiswas/git-pre-push scan-remote` | **Zero-Clone Audit:** Scans any remote GitHub repo without cloning or downloading |
+| `npx @arifbiswas/git-pre-push sweep [folder]` | Scans **every** Git repo under a folder (e.g. your projects folder) and removes confirmed malware |
+| `npx @arifbiswas/git-pre-push vault setup` | Keeps the device logged out of GitHub; token is encrypted and unlocked only for each push |
 | `npx @arifbiswas/git-pre-push clean` | Unstages and quarantines injected malware files to `.git/git-safty-quarantine/` |
 | `npx @arifbiswas/git-pre-push demo` | Simulates a blocked push in terminal |
 | `npx @arifbiswas/git-pre-push action` | Generates a `.github/workflows/git-safty.yml` CI workflow |
@@ -240,7 +293,8 @@ Works out-of-the-box with zero configuration. You can optionally customize behav
     "tests/fixtures/mock-payload.js"
   ],
   "ignoreRules": [],
-  "strict": false
+  "strict": false,
+  "autoClean": true
 }
 ```
 

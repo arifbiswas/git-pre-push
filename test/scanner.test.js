@@ -147,12 +147,39 @@ describe('IDE Configuration Tampering', () => {
 });
 
 describe('Hook Installer and Uninstaller', () => {
-  it('should install and uninstall hook cleanly in current git repo', () => {
-    const installResult = installHook();
-    assert.strictEqual(installResult.success, true);
+  it('should install and uninstall hooks cleanly in an isolated git repo', () => {
+    // Isolate from the developer's real ~/.gitconfig: a global core.hooksPath
+    // would otherwise make this test overwrite and delete the real global hooks.
+    const fs = require('fs');
+    const os = require('os');
+    const path = require('path');
+    const { execFileSync } = require('child_process');
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'gitsafty-hooks-'));
+    const saved = { HOME: process.env.HOME, GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL };
+    process.env.HOME = sandbox;
+    process.env.GIT_CONFIG_GLOBAL = path.join(sandbox, '.gitconfig');
+    try {
+      const repo = path.join(sandbox, 'repo');
+      fs.mkdirSync(repo);
+      execFileSync('git', ['init', '-q'], { cwd: repo });
 
-    const uninstallResult = uninstallHook();
-    assert.strictEqual(uninstallResult.success, true);
+      const installResult = installHook(repo);
+      assert.strictEqual(installResult.success, true);
+      for (const hook of ['pre-push', 'post-checkout', 'post-merge']) {
+        assert.ok(fs.existsSync(path.join(repo, '.git', 'hooks', hook)), `${hook} installed`);
+      }
+
+      const uninstallResult = uninstallHook(repo);
+      assert.strictEqual(uninstallResult.success, true);
+      for (const hook of ['pre-push', 'post-checkout', 'post-merge']) {
+        assert.ok(!fs.existsSync(path.join(repo, '.git', 'hooks', hook)), `${hook} removed`);
+      }
+    } finally {
+      for (const [k, v] of Object.entries(saved)) {
+        if (v === undefined) delete process.env[k]; else process.env[k] = v;
+      }
+      fs.rmSync(sandbox, { recursive: true, force: true });
+    }
   });
 });
 
