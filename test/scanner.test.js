@@ -174,6 +174,18 @@ describe('Hook Installer and Uninstaller', () => {
       for (const hook of ['pre-push', 'post-checkout', 'post-merge']) {
         assert.ok(!fs.existsSync(path.join(repo, '.git', 'hooks', hook)), `${hook} removed`);
       }
+
+      // Global install, then uninstall from a folder that is not a repository.
+      const globalDir = path.join(sandbox, '.git-hooks-safty');
+      assert.strictEqual(installHook(repo, true).success, true);
+      assert.ok(fs.existsSync(path.join(globalDir, 'pre-push')));
+      const notRepo = path.join(sandbox, 'plain');
+      fs.mkdirSync(notRepo);
+      const globalRemoval = uninstallHook(notRepo);
+      assert.strictEqual(globalRemoval.success, true, globalRemoval.message);
+      assert.ok(!fs.existsSync(globalDir), 'global hooks dir removed');
+      const hooksPath = execFileSync('git', ['config', '--global', '--default', '', 'core.hooksPath'], { encoding: 'utf8' }).trim();
+      assert.strictEqual(hooksPath, '', 'core.hooksPath reset');
     } finally {
       for (const [k, v] of Object.entries(saved)) {
         if (v === undefined) delete process.env[k]; else process.env[k] = v;
