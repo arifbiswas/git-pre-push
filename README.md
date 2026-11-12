@@ -62,17 +62,30 @@ gitsafty
 
 Select an action to perform:
 
-  [1] 🛡️  Install Local Hook       - Protect current repository
-  [2] 🌐  Install Global Hook      - Lock down ALL git repos across this PC
-  [3] 🔍  Scan Local Workspace    - Audit staged & untracked files for threats
-  [4] 🚀  Scan Remote GitHub Repo - Zero-clone audit (no download/clone)
-  [5] 🧹  Clean & Quarantine      - Remove temp_*_push.bat & trojan scripts
-  [6] ⚡  Run Push Intercept Demo - Simulate a blocked malware push
-  [7] 🤖  Setup GitHub Action CI  - Guard repository on GitHub server-side
-  [8] ❌  Uninstall Hook          - Remove pre-push hook
-  [0] 🚪  Exit
+  ── Protection ──
+  [1]  🛡️   Install Local Hook       - Protect current repo (push + checkout + pull)
+  [2]  🌐  Install Global Hook      - Protect EVERY repo on this PC: scan on clone, pull & push
+  [8]  ❌  Uninstall Hook           - Remove GitSafty hooks
 
-Enter your choice (1-8, 0 to exit):
+  ── Malware scan & removal ──
+  [3]  🔍  Scan Local Workspace     - Deep scan this repo, auto-remove confirmed malware
+  [10] 🧹  Sweep All Repos          - Scan every git repo in a folder (whole device)
+  [5]  🗑️   Clean & Quarantine       - Remove confirmed malware + trojan scripts here
+  [4]  🚀  Scan Remote GitHub Repo  - Zero-clone audit (no download/clone)
+
+  ── GitHub login vault (device stays logged out) ──
+  [11] 🔐  Vault Setup              - Encrypt token with Touch ID / Windows Hello / passphrase
+  [12] 📋  Vault Status             - Check vault, credential helper & SSH keys
+  [13] 🔓  Vault Test Unlock        - Try one unlock prompt (token is not used)
+  [14] 🚫  Vault Remove             - Back to normal git login
+
+  ── Other ──
+  [6]  ⚡  Run Push Intercept Demo  - Simulate a blocked malware push
+  [7]  🤖  Setup GitHub Action CI   - Guard repository on GitHub server-side
+  [9]  🔄  Check for Updates        - Check if a new version is available on npm
+  [0]  🚪  Exit
+
+Enter your choice (1-14, 0 to exit):
 ```
 
 ---

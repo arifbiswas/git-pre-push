@@ -75,46 +75,13 @@ async function main() {
     case 'vault':
     case 'login-guard': {
       banner();
-      const vault = require('../src/vault');
-      const sub = (args[1] || 'status').toLowerCase();
+      const { runVaultCommand } = require('../src/vaultCli');
       const hostArg = args.find(a => a.startsWith('--host='));
-      const host = hostArg ? hostArg.slice(7).toLowerCase() : undefined;
-
-      if (sub === 'setup' || sub === 'on' || sub === 'enable') {
-        const res = await vault.setupVault({ host: host || 'github.com', mode: args.includes('--passphrase') ? 'passphrase' : 'auto' });
-        if (!res.success) {
-          console.error(`\n${colors.red}${colors.bold}✖ ${res.message}${colors.reset}\n`);
-          process.exit(1);
-        }
-        console.log(`\n${colors.green}${colors.bold}✔ ${res.message}${colors.reset}`);
-        for (const step of res.steps) console.log(`  ${colors.dim}•${colors.reset} ${step}`);
-        for (const key of res.sshWarnings) {
-          console.log(`\n${colors.yellow}⚠ SSH key without passphrase: ${key}${colors.reset}`);
-          console.log(`  ${colors.dim}Anyone who copies it can push as you. Protect it: ${colors.reset}ssh-keygen -p -f ${key}`);
-        }
-        console.log('');
-      } else if (sub === 'test') {
-        const res = vault.testUnlock();
-        console.log(`\n${res.success ? colors.green + '✔' : colors.red + '✖'} ${res.message}${colors.reset}\n`);
-        if (!res.success) process.exit(1);
-      } else if (sub === 'remove' || sub === 'off' || sub === 'disable') {
-        const res = vault.removeVault({ host });
-        console.log(`\n${colors.yellow}${colors.bold}✔ ${res.message}${colors.reset}\n`);
-      } else {
-        const st = vault.vaultStatus({ host });
-        const ok = (b) => (b ? `${colors.green}✔` : `${colors.red}✖`) + colors.reset;
-        console.log(`\n${colors.bold}GitSafty Vault (${st.host})${colors.reset}`);
-        console.log(`  ${ok(st.vaultExists)} Encrypted token vault ${st.vaultExists ? `(${st.username}, file mode ${st.vaultMode})` : '(not set up: run gitsafty vault setup)'}`);
-        if (st.vaultExists) {
-          const hw = st.protection !== 'passphrase';
-          console.log(`  ${ok(hw)} Locked to this device's security chip ${hw ? `(${st.protection})` : '(passphrase only: run vault setup again on a Mac with Secure Enclave or Windows with Hello)'}`);
-        }
-        if (st.tokenExpiresAt) console.log(`    ${colors.dim}Token expires: ${st.tokenExpiresAt}${colors.reset}`);
-        console.log(`  ${ok(st.helperActive)} GitSafty is git's credential helper for ${st.host}`);
-        console.log(`  ${ok(st.otherHelpers.length === 0)} No other helper can store or hand out a token${st.otherHelpers.length ? `: ${st.otherHelpers.join(', ')}` : ''}`);
-        console.log(`  ${ok(st.sshWarnings.length === 0)} SSH private keys are passphrase-protected${st.sshWarnings.length ? `: ${st.sshWarnings.join(', ')}` : ''}`);
-        console.log('');
-      }
+      const code = await runVaultCommand(args[1], {
+        host: hostArg ? hostArg.slice(7).toLowerCase() : undefined,
+        passphrase: args.includes('--passphrase')
+      });
+      if (code) process.exit(code);
       break;
     }
 

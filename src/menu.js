@@ -1,11 +1,23 @@
 const readline = require('readline');
 const { banner, colors } = require('./reporter');
-const { runManualScan, installHook, uninstallHook } = require('./index');
+const { runManualScan, runSweep, scanAndCleanRepo, installHook, uninstallHook } = require('./index');
 const { cleanInfectedFiles } = require('./cleaner');
 const { setupGitHubAction } = require('./action');
 const { scanRemoteRepositoryZeroClone, printRemoteScanReport } = require('./remoteScanner');
 const { scanFilesAndDiff } = require('./scanner');
 const { printReport, printBlockMessage } = require('./reporter');
+const { runVaultCommand } = require('./vaultCli');
+
+/** One-line question on the terminal. */
+function ask(question) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+}
 
 /**
  * Runs an interactive numbered menu in terminal
@@ -13,17 +25,34 @@ const { printReport, printBlockMessage } = require('./reporter');
 async function runInteractiveMenu() {
   banner();
 
-  console.log(`\n${colors.bold}${colors.cyan}Select an action to perform:${colors.reset}\n`);
-  console.log(`  ${colors.green}[1]${colors.reset} 🛡️  ${colors.bold}Install Local Hook${colors.reset}       - Protect current repository`);
-  console.log(`  ${colors.green}[2]${colors.reset} 🌐  ${colors.bold}Install Global Hook${colors.reset}      - Lock down ALL git repos across this PC`);
-  console.log(`  ${colors.green}[3]${colors.reset} 🔍  ${colors.bold}Scan Local Workspace${colors.reset}    - Audit staged & untracked files for threats`);
-  console.log(`  ${colors.green}[4]${colors.reset} 🚀  ${colors.bold}Scan Remote GitHub Repo${colors.reset} - Zero-clone audit (no download/clone)`);
-  console.log(`  ${colors.green}[5]${colors.reset} 🧹  ${colors.bold}Clean & Quarantine${colors.reset}      - Remove temp_*_push.bat & trojan scripts`);
-  console.log(`  ${colors.green}[6]${colors.reset} ⚡  ${colors.bold}Run Push Intercept Demo${colors.reset} - Simulate a blocked malware push`);
-  console.log(`  ${colors.green}[7]${colors.reset} 🤖  ${colors.bold}Setup GitHub Action CI${colors.reset}  - Guard repository on GitHub server-side`);
-  console.log(`  ${colors.green}[8]${colors.reset} ❌  ${colors.bold}Uninstall Hook${colors.reset}          - Remove pre-push hook`);
-  console.log(`  ${colors.green}[9]${colors.reset} 🔄  ${colors.bold}Check for Updates${colors.reset}       - Check if a new version is available on npm`);
-  console.log(`  ${colors.dim}[0] 🚪  Exit${colors.reset}\n`);
+  const item = (n, icon, title, desc) =>
+    console.log(`  ${colors.green}[${n}]${colors.reset}${String(n).length === 1 ? ' ' : ''} ${icon}  ${colors.bold}${title.padEnd(24)}${colors.reset} - ${desc}`);
+  const section = (title) => console.log(`\n  ${colors.dim}── ${title} ──${colors.reset}`);
+
+  console.log(`\n${colors.bold}${colors.cyan}Select an action to perform:${colors.reset}`);
+
+  section('Protection');
+  item(1, '🛡️ ', 'Install Local Hook', 'Protect current repo (push + checkout + pull)');
+  item(2, '🌐', 'Install Global Hook', 'Protect EVERY repo on this PC: scan on clone, pull & push');
+  item(8, '❌', 'Uninstall Hook', 'Remove GitSafty hooks');
+
+  section('Malware scan & removal');
+  item(3, '🔍', 'Scan Local Workspace', 'Deep scan this repo, auto-remove confirmed malware');
+  item(10, '🧹', 'Sweep All Repos', 'Scan every git repo in a folder (whole device)');
+  item(5, '🗑️ ', 'Clean & Quarantine', 'Remove confirmed malware + trojan scripts here');
+  item(4, '🚀', 'Scan Remote GitHub Repo', 'Zero-clone audit (no download/clone)');
+
+  section('GitHub login vault (device stays logged out)');
+  item(11, '🔐', 'Vault Setup', 'Encrypt token with Touch ID / Windows Hello / passphrase');
+  item(12, '📋', 'Vault Status', 'Check vault, credential helper & SSH keys');
+  item(13, '🔓', 'Vault Test Unlock', 'Try one unlock prompt (token is not used)');
+  item(14, '🚫', 'Vault Remove', 'Back to normal git login');
+
+  section('Other');
+  item(6, '⚡', 'Run Push Intercept Demo', 'Simulate a blocked malware push');
+  item(7, '🤖', 'Setup GitHub Action CI', 'Guard repository on GitHub server-side');
+  item(9, '🔄', 'Check for Updates', 'Check if a new version is available on npm');
+  console.log(`  ${colors.dim}[0]  🚪  Exit${colors.reset}\n`);
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -31,7 +60,7 @@ async function runInteractiveMenu() {
   });
 
   const choice = await new Promise((resolve) => {
-    rl.question(`${colors.bold}${colors.yellow}Enter your choice (1-9, 0 to exit): ${colors.reset}`, (ans) => {
+    rl.question(`${colors.bold}${colors.yellow}Enter your choice (1-14, 0 to exit): ${colors.reset}`, (ans) => {
       rl.close();
       resolve(ans.trim());
     });
@@ -39,7 +68,7 @@ async function runInteractiveMenu() {
 
   switch (choice) {
     case '1': {
-      console.log(`\n${colors.cyan}Installing local pre-push hook...${colors.reset}`);
+      console.log(`\n${colors.cyan}Installing local hooks (push + checkout + pull scan)...${colors.reset}`);
       const res = installHook(process.cwd(), false);
       if (res.success) {
         console.log(`\n${colors.green}${colors.bold}✔ ${res.message}${colors.reset}\n`);
@@ -50,7 +79,7 @@ async function runInteractiveMenu() {
     }
 
     case '2': {
-      console.log(`\n${colors.cyan}Installing GLOBAL pre-push hook for all repositories...${colors.reset}`);
+      console.log(`\n${colors.cyan}Installing GLOBAL hooks (push + clone + pull scan) for all repositories...${colors.reset}`);
       const res = installHook(process.cwd(), true);
       if (res.success) {
         console.log(`\n${colors.green}${colors.bold}✔ ${res.message}${colors.reset}\n`);
@@ -97,6 +126,8 @@ async function runInteractiveMenu() {
 
     case '5': {
       console.log(`\n${colors.cyan}Scanning workspace for injected malware scripts to quarantine...${colors.reset}`);
+      const { getAllRepoFiles } = require('./utils/git');
+      scanAndCleanRepo(getAllRepoFiles(), process.cwd(), { reason: 'clean' });
       const cleanResult = cleanInfectedFiles();
       if (cleanResult.quarantined.length > 0) {
         console.log(`\n${colors.yellow}${colors.bold}⚠ Quarantined ${cleanResult.quarantined.length} malicious file(s):${colors.reset}`);
@@ -148,6 +179,38 @@ async function runInteractiveMenu() {
       const pkg = require('../package.json');
       const { checkUpdateManual } = require('./updateNotifier');
       await checkUpdateManual(pkg.version);
+      break;
+    }
+
+    case '10': {
+      const folder = await ask(`\n${colors.bold}${colors.cyan}? Folder to sweep (Enter = ${process.cwd()}): ${colors.reset}`);
+      const removeAnswer = await ask(`${colors.bold}${colors.cyan}? Automatically remove CONFIRMED malware? Suspicious items are never touched. (Y/n): ${colors.reset}`);
+      const clean = !/^n(o)?$/i.test(removeAnswer);
+      runSweep(folder || process.cwd(), { clean });
+      break;
+    }
+
+    case '11': {
+      const mode = await ask(`\n${colors.bold}${colors.cyan}? Protect with this device's security chip (Touch ID / Windows Hello)? (Y = chip, n = passphrase only): ${colors.reset}`);
+      await runVaultCommand('setup', { passphrase: /^n(o)?$/i.test(mode) });
+      break;
+    }
+
+    case '12':
+      await runVaultCommand('status');
+      break;
+
+    case '13':
+      await runVaultCommand('test');
+      break;
+
+    case '14': {
+      const sure = await ask(`\n${colors.bold}${colors.yellow}? Remove the vault and go back to normal git login? (y/N): ${colors.reset}`);
+      if (/^y(es)?$/i.test(sure)) {
+        await runVaultCommand('remove');
+      } else {
+        console.log(`${colors.dim}Vault kept.${colors.reset}\n`);
+      }
       break;
     }
 
