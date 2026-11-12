@@ -1,0 +1,11 @@
+{
+  "ignoreFiles": [
+    "test/scanner.test.js",
+    "test/malware.test.js",
+    "test/e2e.test.js",
+    "src/vault.js",
+    "src/hwkey/windows-hello.ps1"
+  ],
+  "ignoreRules": [],
+  "strict": false
+}

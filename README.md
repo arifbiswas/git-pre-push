@@ -69,6 +69,7 @@ Select an action to perform:
 
   ── Malware scan & removal ──
   [3]  🔍  Scan Local Workspace     - Deep scan this repo, auto-remove confirmed malware
+  [16] 🔬  Advanced Scanner         - Audit ALL projects in a folder: malware, backdoors, secrets
   [10] 🧹  Sweep All Repos          - Scan every git repo in a folder (whole device)
   [5]  🗑️   Clean & Quarantine       - Remove confirmed malware + trojan scripts here
   [4]  🚀  Scan Remote GitHub Repo  - Zero-clone audit (no download/clone)
@@ -86,10 +87,12 @@ Select an action to perform:
   [15] 🩺  Doctor                   - Something broken? Find it and show/apply the fix
   [0]  🚪  Exit
 
-Enter your choice (1-15, 0 to exit):
+Enter your choice (1-16, 0 to exit):
 ```
 
 ---
+
+**Updates:** every time you open `gitsafty` it checks npm. When a new version is out it asks `Install GitSafty x.y.z now? (Y/n)`; answer `y` and it installs and reopens the new version (global installs only; never inside git hooks or CI). Turn the question off with `GITSAFTY_NO_UPDATE_PROMPT=1`.
 
 ### Option 3: Lock Down an Entire Machine (Global Protection)
 
@@ -210,6 +213,40 @@ Limits, honestly: the chip stops token theft (copying files, Keychain or browser
 
 ---
 
+## 🔬 Advanced Scanner (many projects at once)
+
+Got a folder with 20 projects? Audit all of them in one go:
+
+```bash
+gitsafty scan-projects ~/projects            # report only
+gitsafty scan-projects ~/projects --clean    # also remove CONFIRMED malware
+gitsafty scan-projects ~/projects --deep     # include node_modules, build output, ignored files
+gitsafty scan-projects ~/projects --json     # machine-readable output
+```
+
+Every direct sub-folder is a project (git repository or not; nested repos are found too). For each one it checks:
+
+- **Malware**: the confirmed-malware engine on every file (always on, even for ignored paths)
+- **Git backdoors**: unknown hooks in `.git/hooks`, and `core.fsmonitor`, `core.hooksPath`, `core.sshCommand`, filter drivers, `diff.external`, `!` aliases, repo-local credential helpers, which run code during normal git commands
+- **IDE auto-run**: `.vscode` / `.idea` tasks and settings
+- **Exposed secrets**: keys and tokens in code, and `.env` files that git tracks (masked in the output)
+- **Dangerous files**: executables, disguised double extensions
+
+When it finishes you get, for every project, what was found, what was **removed** (and how: whole file quarantined, or malware cut out and the rest kept), and what still needs your attention with the exact command to fix it, followed by a table:
+
+```text
+Results per project
+  Project        Status    Found   Removed   To review
+  shop-backend   CLEANED   8       8         0
+  admin-panel    DANGER    2       0         2
+  mobile-app     SECRETS   3       0         3
+  landing        CLEAN     0       0         0
+```
+
+A JSON report is saved to `~/.gitsafty/reports/`. Only confirmed malware is ever removed (with backups); backdoors and secrets are reported with a fix command. Use `.gitsafetyrc.json` `ignoreFiles` for known test fixtures.
+
+---
+
 ## 🩺 Troubleshooting (`doctor`)
 
 Something not working? One command finds out what and prints the exact fix:
@@ -252,6 +289,7 @@ git config --global --remove-section credential.https://github.com   # only if y
 | `npx @arifbiswas/git-pre-push clean` | Unstages and quarantines injected malware files to `.git/git-safty-quarantine/` |
 | `npx @arifbiswas/git-pre-push demo` | Simulates a blocked push in terminal |
 | `npx @arifbiswas/git-pre-push action` | Generates a `.github/workflows/git-safty.yml` CI workflow |
+| `npx @arifbiswas/git-pre-push scan-projects <folder>` | **Advanced Scanner**: audit every project in a folder (malware, git backdoors, IDE, secrets) |
 | `npx @arifbiswas/git-pre-push doctor [--fix]` | Finds broken/outdated installs and shows (or applies) the exact fix |
 | `npx @arifbiswas/git-pre-push uninstall` | Cleanly removes the hook from `.git/hooks` |
 

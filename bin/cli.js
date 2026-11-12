@@ -24,8 +24,10 @@ const isGlobalFlag = args.includes('--global') || args.includes('-g');
 async function main() {
   // Check for updates non-blocking on interactive commands
   const hookCommands = ['scan-push', 'scan-checkout', 'scan-merge', 'credential'];
-  if (!hookCommands.includes(command)) {
-    await notifyIfUpdateAvailable(pkg.version);
+  // `gitsafty update` does its own check below.
+  if (!hookCommands.includes(command) && command !== 'update' && command !== 'upgrade') {
+    // Opening the menu always asks the registry, so a fresh release is never missed.
+    await notifyIfUpdateAvailable(pkg.version, { force: command === 'menu' || command === 'interactive' });
   }
 
   switch (command) {
@@ -84,6 +86,20 @@ async function main() {
         passphrase: args.includes('--passphrase')
       });
       if (code) process.exit(code);
+      break;
+    }
+
+    case 'scan-projects':
+    case 'advanced':
+    case 'advanced-scan': {
+      banner();
+      const { runAdvancedScan } = require('../src/advancedScanner');
+      const target = args.find((a, i) => i > 0 && !a.startsWith('-')) || process.cwd();
+      process.exit(runAdvancedScan(target, {
+        clean: args.includes('--clean'),
+        deep: args.includes('--deep'),
+        json: args.includes('--json')
+      }));
       break;
     }
 
@@ -257,6 +273,8 @@ ${colors.bold}Commands:${colors.reset}
   ${colors.green}vault status${colors.reset} Show vault / credential helper / SSH key protection status
   ${colors.green}vault test${colors.reset}   Try one unlock (prompt) without using the token
   ${colors.green}vault remove${colors.reset} Turn the vault off and go back to normal git login
+  ${colors.green}scan-projects${colors.reset} <folder>  Advanced Scanner: audit EVERY project in a folder at once
+               (malware, git backdoors, IDE auto-run, secrets) [--clean] [--deep] [--json]
   ${colors.green}doctor${colors.reset}       Find broken/outdated installs and show the exact fix (--fix applies it)
   ${colors.green}uninstall${colors.reset}    Remove hooks from this repo (outside a repo, or with --global: remove global hooks)
 
