@@ -255,8 +255,58 @@ async function checkUpdateManual(currentVersion) {
   }
 }
 
+/** Path of the globally installed CLI (after `npm install -g`), or null. */
+function globalCliPath() {
+  try {
+    const { execFileSync } = require('child_process');
+    const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const root = execFileSync(npm, ['root', '-g'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000, shell: process.platform === 'win32' }).trim();
+    const cli = path.join(root, '@arifbiswas', 'git-pre-push', 'bin', 'cli.js');
+    return fs.existsSync(cli) ? cli : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Called after `npx ... init`: npx only runs GitSafty from a temporary cache,
+ * so there is no `gitsafty` command and the hooks point into that cache.
+ * Explains this and (interactively) installs GitSafty for real, then
+ * re-runs init with the permanent copy so the hooks point there.
+ * @param {string[]} initArgs e.g. ['init', '--global']
+ */
+async function offerPermanentInstall(initArgs) {
+  if (installKind() !== 'npx') return;
+  const isWin = process.platform === 'win32';
+  console.log(`${colors.yellow}${colors.bold}⚠ You ran GitSafty with npx.${colors.reset}`);
+  console.log(`  npx only runs it from a temporary cache: the ${colors.bold}gitsafty${colors.reset} command is not installed,`);
+  console.log(`  and the hooks point into that cache, which npm may delete later.`);
+  console.log(`  ${colors.dim}Install it permanently:${colors.reset} ${colors.cyan}npm install -g ${PACKAGE_NAME}${colors.reset} ${colors.dim}then${colors.reset} ${colors.cyan}gitsafty ${initArgs.join(' ')}${colors.reset}\n`);
+
+  if (!isInteractive() || process.env.GITSAFTY_NO_UPDATE_PROMPT === '1') return;
+  const yes = await askYesNo(`${colors.bold}${colors.cyan}? Install GitSafty permanently now (adds the gitsafty command)? (Y/n): ${colors.reset}`);
+  if (!yes) return;
+  if (!installVersion('latest')) return;
+
+  const cli = globalCliPath();
+  if (!cli) {
+    console.log(`${colors.yellow}Installed, but could not locate the global copy. Run: gitsafty ${initArgs.join(' ')}${colors.reset}\n`);
+    return;
+  }
+  const { spawnSync } = require('child_process');
+  spawnSync(process.execPath, [cli, ...initArgs], { stdio: 'inherit', env: { ...process.env, GITSAFTY_JUST_UPDATED: '1' } });
+  console.log(`${colors.green}${colors.bold}✔ Done.${colors.reset} Open a ${colors.bold}new${colors.reset} terminal${isWin ? ' window' : ''} and type ${colors.cyan}gitsafty${colors.reset}.`);
+  if (isWin) {
+    console.log(`  ${colors.dim}Still "not recognized"? Add npm's folder to PATH: run ${colors.reset}${colors.cyan}npm config get prefix${colors.reset}${colors.dim} and add that folder in`);
+    console.log(`  Settings > System > About > Advanced system settings > Environment Variables > Path.${colors.reset}`);
+  }
+  console.log('');
+}
+
 module.exports = {
   isNewerVersion,
+  offerPermanentInstall,
+  globalCliPath,
   installKind,
   offerUpdate,
   notifyIfUpdateAvailable,
