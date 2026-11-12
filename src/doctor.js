@@ -220,6 +220,17 @@ function runChecks({ cwd = process.cwd(), cliPath } = {}) {
     checks.push({ id: 'global-hooks-foreign', ok: true, level: 'warn', title: `core.hooksPath points to another tool's folder: ${hooksPath}`, detail: 'GitSafty global hooks are not active.' });
   }
 
+  // Shell pull-scan function
+  try {
+    const shell = require('./shellIntegration');
+    const st = shell.shellIntegrationStatus();
+    if (!st.installed.length) {
+      checks.push({ id: 'pull-scan', ok: true, level: 'warn', title: 'Pulls that are "Already up to date" are not scanned (git runs no hook then)', commands: ['gitsafty pull-scan on'] });
+    } else {
+      checks.push({ id: 'pull-scan', ok: true, level: 'ok', title: `Every git pull is scanned (${st.installed.join(', ')})`, fix: () => shell.installShellIntegration() });
+    }
+  } catch (_) {}
+
   // Credential helper / vault
   try {
     const vault = require('./vault');

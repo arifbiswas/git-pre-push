@@ -72,6 +72,7 @@ Select an action to perform:
   ── Protection ──
   [1]  🛡️   Install Local Hook       - Protect current repo (push + checkout + pull)
   [2]  🌐  Install Global Hook      - Protect EVERY repo on this PC: scan on clone, pull & push
+  [17] 🔁  Scan Every Pull          - Also scan when git pull says "Already up to date"
   [8]  ❌  Uninstall Hook           - Remove GitSafty hooks (this repo or whole PC)
 
   ── Malware scan & removal ──
@@ -112,6 +113,15 @@ npx @arifbiswas/git-pre-push init --global
 This configures `git config --global core.hooksPath`, ensuring every repository on your PC runs the security scanner before any push, **and after every `git clone`, `git checkout` and `git pull`**.
 
 > Already installed globally? Run `init --global` again after updating so the new clone/pull hooks are added.
+
+**Every `git pull` is scanned.** Pulls that bring changes (merge, fast-forward or `--rebase`) are scanned by the hooks, and the whole repository is checked, like after a clone. When git says *"Already up to date"* it runs **no hook at all**, so `init --global` offers to add a small `git` function to your shell profile (`~/.zshrc`, `~/.bashrc`, fish, or the PowerShell profile on Windows) that scans after every `git pull`, keeps git's exit code and never scans twice for the same pull:
+
+```bash
+gitsafty pull-scan on     # turn on (also menu [17])
+gitsafty pull-scan off    # remove the function again
+```
+
+IDE "Sync"/"Pull" buttons that bring changes are covered by the hooks; only no-change pulls from a terminal need the shell function.
 
 ---
 
@@ -297,6 +307,7 @@ git config --global --remove-section credential.https://github.com   # only if y
 | `npx @arifbiswas/git-pre-push demo` | Simulates a blocked push in terminal |
 | `npx @arifbiswas/git-pre-push action` | Generates a `.github/workflows/git-safty.yml` CI workflow |
 | `npx @arifbiswas/git-pre-push scan-projects <folder>` | **Advanced Scanner**: audit every project in a folder (malware, git backdoors, IDE, secrets) |
+| `npx @arifbiswas/git-pre-push pull-scan on\|off` | Scan after every `git pull`, also when "Already up to date" (adds a shell `git` function) |
 | `npx @arifbiswas/git-pre-push doctor [--fix]` | Finds broken/outdated installs and shows (or applies) the exact fix |
 | `npx @arifbiswas/git-pre-push uninstall` | Cleanly removes the hook from `.git/hooks` |
 

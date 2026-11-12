@@ -5,7 +5,7 @@ const { getHooksDir, isGitRepo } = require('./utils/git');
 const HOOK_MARKER = '# --- GIT-SAFTY SECURITY HOOK START ---';
 const HOOK_END_MARKER = '# --- GIT-SAFTY SECURITY HOOK END ---';
 
-const HOOK_TYPES = ['pre-push', 'post-checkout', 'post-merge'];
+const HOOK_TYPES = ['pre-push', 'post-checkout', 'post-merge', 'post-rewrite'];
 
 // Absolute path of this installation's CLI, baked into the hook so a cloned
 // repository can never substitute its own ./bin/cli.js or node_modules copy.
@@ -46,7 +46,7 @@ gitsafty_missing() {
     *.git-hooks-safty)
       echo "   Or turn off:   git config --global --unset core.hooksPath && rm -rf ~/.git-hooks-safty" >&2 ;;
     *)
-      echo "   Or turn off:   rm \\"$HOOK_DIR/pre-push\\" \\"$HOOK_DIR/post-checkout\\" \\"$HOOK_DIR/post-merge\\"" >&2 ;;
+      echo "   Or turn off:   rm \\"$HOOK_DIR/pre-push\\" \\"$HOOK_DIR/post-checkout\\" \\"$HOOK_DIR/post-merge\\" \\"$HOOK_DIR/post-rewrite\\"" >&2 ;;
   esac
   echo "" >&2
 }
@@ -111,7 +111,7 @@ fi`;
 }
 
 function postHookBody(hookType) {
-  const command = hookType === 'post-checkout' ? 'scan-checkout' : 'scan-merge';
+  const command = { 'post-checkout': 'scan-checkout', 'post-merge': 'scan-merge', 'post-rewrite': 'scan-rewrite' }[hookType];
   return `# Runs after git clone / checkout / pull. Reports and removes confirmed
 # malware. Never fails the git command itself.
 run_gitsafty ${command} "$@"
@@ -210,7 +210,7 @@ function installHook(cwd = process.cwd(), isGlobal = false) {
     const typeMsg = isGlobal ? 'GLOBAL Git hook for ALL repositories on this PC' : 'local pre-push hook';
     return {
       success: true,
-      message: `Successfully installed GitSafty ${typeMsg} (pre-push, post-checkout, post-merge) at: ${path.dirname(hookPath)}`
+      message: `Successfully installed GitSafty ${typeMsg} (pre-push, post-checkout, post-merge, post-rewrite) at: ${path.dirname(hookPath)}`
     };
   } catch (err) {
     return {

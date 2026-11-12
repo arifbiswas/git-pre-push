@@ -6,6 +6,8 @@ const {
   runManualScan,
   runPostCheckout,
   runPostMerge,
+  runPostRewrite,
+  runScanPull,
   runSweep,
   scanAndCleanRepo,
   installHook,
@@ -21,9 +23,34 @@ const args = process.argv.slice(2);
 const command = args[0] ? args[0].toLowerCase() : 'menu';
 const isGlobalFlag = args.includes('--global') || args.includes('-g');
 
+/** After a global install: offer the shell function that scans every git pull. */
+async function offerPullScan() {
+  const shell = require('../src/shellIntegration');
+  if (shell.shellIntegrationStatus().installed.length) {
+    shell.installShellIntegration(); // refresh with this version's paths
+    return;
+  }
+  const interactive = process.stdin.isTTY && process.stdout.isTTY && !process.env.CI;
+  console.log(`${colors.dim}git runs no hook when a pull is "Already up to date". To scan after EVERY git pull,${colors.reset}`);
+  console.log(`${colors.dim}GitSafty can add a small git function to your shell profile (.zshrc / .bashrc / PowerShell profile).${colors.reset}`);
+  if (!interactive) {
+    console.log(`  Turn it on: ${colors.cyan}gitsafty pull-scan on${colors.reset}\n`);
+    return;
+  }
+  const readline = require('readline');
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await new Promise(r => rl.question(`${colors.bold}${colors.cyan}? Scan after every git pull? (Y/n): ${colors.reset}`, a => { rl.close(); r(a.trim()); }));
+  if (/^n(o)?$/i.test(answer)) {
+    console.log(`  ${colors.dim}Skipped. Turn it on later: gitsafty pull-scan on${colors.reset}\n`);
+    return;
+  }
+  const res = shell.installShellIntegration();
+  console.log(`${colors.green}✔ Pull scan on${colors.reset} ${colors.dim}(${res.files.join(', ')})${colors.reset}. Load it now: ${colors.cyan}${shell.reloadHint()}${colors.reset}\n`);
+}
+
 async function main() {
   // Check for updates non-blocking on interactive commands
-  const hookCommands = ['scan-push', 'scan-checkout', 'scan-merge', 'credential'];
+  const hookCommands = ['scan-push', 'scan-checkout', 'scan-merge', 'scan-rewrite', 'scan-pull', 'credential'];
   // `gitsafty update` does its own check below.
   if (!hookCommands.includes(command) && command !== 'update' && command !== 'upgrade') {
     // Opening the menu always asks the registry, so a fresh release is never missed.
@@ -108,6 +135,54 @@ async function main() {
       banner();
       const { runDoctor } = require('../src/doctor');
       process.exit(runDoctor({ fix: args.includes('--fix') }));
+      break;
+    }
+
+    // Triggered by the post-rewrite hook (git pull --rebase)
+    case 'scan-rewrite':
+      try {
+        runPostRewrite(args[1]);
+      } catch (err) {
+        console.error(`[GitSafty] pull scan error: ${err.message}`);
+        try { require('../src/doctor').printHint(err); } catch (_) {}
+      }
+      process.exit(0);
+      break;
+
+    // Called by the optional shell git wrapper after every git pull
+    case 'scan-pull':
+      try {
+        runScanPull();
+      } catch (err) {
+        console.error(`[GitSafty] pull scan error: ${err.message}`);
+      }
+      process.exit(0);
+      break;
+
+    case 'pull-scan':
+    case 'shell-integration': {
+      banner();
+      const shell = require('../src/shellIntegration');
+      const sub = (args[1] || 'status').toLowerCase();
+      if (sub === 'on' || sub === 'install' || sub === 'enable') {
+        const res = shell.installShellIntegration();
+        if (!res.files.length) {
+          console.log(`\n${colors.yellow}No shell profile found to update.${colors.reset}\n`);
+        } else {
+          console.log(`\n${colors.green}${colors.bold}✔ Every git pull will now be scanned (also "Already up to date").${colors.reset}`);
+          for (const f of res.files) console.log(`  ${colors.dim}updated ${f}${colors.reset}`);
+          console.log(`  Load it now: ${colors.cyan}${shell.reloadHint()}${colors.reset}\n`);
+        }
+      } else if (sub === 'off' || sub === 'remove' || sub === 'disable') {
+        const res = shell.removeShellIntegration();
+        console.log(`\n${colors.yellow}${colors.bold}✔ Pull scan shell function removed${res.files.length ? ` from ${res.files.join(', ')}` : ' (was not installed)'}.${colors.reset}`);
+        console.log(`  ${colors.dim}Open a new terminal to finish. Pulls that bring changes are still scanned by the git hooks.${colors.reset}\n`);
+      } else {
+        const st = shell.shellIntegrationStatus();
+        console.log(st.installed.length
+          ? `\n${colors.green}✔ Pull scan is ON${colors.reset} ${colors.dim}(${st.installed.join(', ')})${colors.reset}\n`
+          : `\n${colors.yellow}Pull scan shell function is OFF.${colors.reset} Pulls that bring changes are still scanned by the git hooks.\n  Turn on scanning for every pull: ${colors.cyan}gitsafty pull-scan on${colors.reset}\n`);
+      }
       break;
     }
 
@@ -229,6 +304,7 @@ async function main() {
         console.log(`\n${colors.green}${colors.bold}✔ ${result.message}${colors.reset}\n`);
         console.log(`${colors.cyan}Your git environment is now protected!${colors.reset}`);
         console.log(`${colors.dim}Every git push, clone and pull${isGlobalFlag ? ' on this PC' : ' in this repository'} is scanned for malware & secret leaks.${colors.reset}\n`);
+        if (isGlobalFlag) await offerPullScan();
         const { offerPermanentInstall } = require('../src/updateNotifier');
         await offerPermanentInstall(['init', ...(isGlobalFlag ? ['--global'] : [])]);
       } else {
@@ -244,6 +320,10 @@ async function main() {
       const result = uninstallHook(process.cwd(), isGlobalFlag);
       if (result.success) {
         console.log(`\n${colors.yellow}${colors.bold}✔ ${result.message}${colors.reset}\n`);
+        if (/global/i.test(result.message)) {
+          const removed = require('../src/shellIntegration').removeShellIntegration();
+          if (removed.files.length) console.log(`${colors.dim}Also removed the git pull scan function from ${removed.files.join(', ')}.${colors.reset}\n`);
+        }
       } else {
         console.error(`\n${colors.red}${colors.bold}✖ ${result.message}${colors.reset}\n`);
         process.exit(1);
@@ -277,6 +357,7 @@ ${colors.bold}Commands:${colors.reset}
   ${colors.green}vault remove${colors.reset} Turn the vault off and go back to normal git login
   ${colors.green}scan-projects${colors.reset} <folder>  Advanced Scanner: audit EVERY project in a folder at once
                (malware, git backdoors, IDE auto-run, secrets) [--clean] [--deep] [--json]
+  ${colors.green}pull-scan${colors.reset} on|off  Scan after EVERY git pull, also "Already up to date" (adds a git shell function)
   ${colors.green}doctor${colors.reset}       Find broken/outdated installs and show the exact fix (--fix applies it)
   ${colors.green}update${colors.reset}       Check npm for a new version and install it
   ${colors.green}uninstall${colors.reset}    Remove hooks from this repo (outside a repo, or with --global: remove global hooks)

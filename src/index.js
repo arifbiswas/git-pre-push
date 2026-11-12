@@ -128,17 +128,71 @@ function runPostCheckout(prevHead, newHead, flag) {
   }
   if (!files.length) return 0;
   scanAndCleanRepo(files, cwd, { reason: isClone ? 'clone' : 'checkout', quietWhenClean: !isClone });
+  if (isClone) recordScan(cwd);
   return 0;
 }
 
-/** post-merge hook: runs after git pull / git merge. */
+const LAST_SCAN_FILE = 'gitsafty-last-scan.json';
+// Only to avoid scanning twice in ONE pull (hook + shell function run seconds apart).
+const RECENT_SCAN_MS = 5 * 1000;
+
+function gitDirOf(cwd) {
+  const d = gitLines(['rev-parse', '--git-dir'], cwd)[0];
+  return d ? path.resolve(cwd, d) : null;
+}
+
+function headOf(cwd) {
+  return gitLines(['rev-parse', 'HEAD'], cwd)[0] || '';
+}
+
+function recordScan(cwd) {
+  const dir = gitDirOf(cwd);
+  if (!dir) return;
+  try { fs.writeFileSync(path.join(dir, LAST_SCAN_FILE), JSON.stringify({ head: headOf(cwd), at: Date.now() })); } catch (_) {}
+}
+
+function scannedRecently(cwd) {
+  const dir = gitDirOf(cwd);
+  if (!dir) return false;
+  try {
+    const last = JSON.parse(fs.readFileSync(path.join(dir, LAST_SCAN_FILE), 'utf8'));
+    return last.head === headOf(cwd) && Date.now() - last.at < RECENT_SCAN_MS;
+  } catch (_) {
+    return false;
+  }
+}
+
+/** Scans every tracked file, like after a clone, and always prints the result. */
+function scanWholeRepo(cwd, reason, label) {
+  const files = gitNulList(['ls-files'], cwd);
+  console.log(`${colors.cyan}${colors.bold}🛡️  GitSafty:${colors.reset} scanning repository after ${label}...`);
+  if (files.length) scanAndCleanRepo(files, cwd, { reason, quietWhenClean: false });
+  recordScan(cwd);
+  return 0;
+}
+
+/** post-merge hook: runs after git pull (merge / fast-forward) and git merge. */
 function runPostMerge() {
   if (process.env.GITSAFTY_SKIP === '1') return 0;
+  return scanWholeRepo(process.cwd(), 'pull', 'git pull');
+}
+
+/** post-rewrite hook: `git pull --rebase` (and git rebase) never run post-merge. */
+function runPostRewrite(kind) {
+  if (process.env.GITSAFTY_SKIP === '1' || kind !== 'rebase') return 0;
+  return scanWholeRepo(process.cwd(), 'pull', 'git pull --rebase');
+}
+
+/**
+ * Called by the optional shell `git` wrapper after every `git pull`, also when
+ * git says "Already up to date" (git runs no hook at all in that case).
+ * Skips when a hook already scanned this exact commit a moment ago.
+ */
+function runScanPull() {
+  if (process.env.GITSAFTY_SKIP === '1') return 0;
   const cwd = process.cwd();
-  const files = gitLines(['diff', '--name-only', '--diff-filter=ACMR', 'ORIG_HEAD', 'HEAD'], cwd);
-  if (!files.length) return 0;
-  scanAndCleanRepo(files, cwd, { reason: 'pull', quietWhenClean: true });
-  return 0;
+  if (!gitDirOf(cwd) || scannedRecently(cwd)) return 0;
+  return scanWholeRepo(cwd, 'pull', 'git pull');
 }
 
 function findGitRepos(root, maxDepth = 6) {
@@ -318,6 +372,8 @@ module.exports = {
   runManualScan,
   runPostCheckout,
   runPostMerge,
+  runPostRewrite,
+  runScanPull,
   runSweep,
   scanAndCleanRepo,
   installHook,
