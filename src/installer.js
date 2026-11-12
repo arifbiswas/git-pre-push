@@ -202,41 +202,106 @@ function installHook(cwd = process.cwd(), isGlobal = false) {
   }
 }
 
+function globalHooksDir() {
+  const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+  return path.join(homeDir, '.git-hooks-safty');
+}
+
+/** Removes the GitSafty block from every hook in a directory. */
+function stripHooksIn(hooksDir) {
+  let removed = 0;
+  for (const type of HOOK_TYPES) {
+    const hookPath = path.join(hooksDir, type);
+    if (!fs.existsSync(hookPath)) continue;
+    try { fs.chmodSync(hookPath, 0o755); } catch (_) {}
+    const existing = fs.readFileSync(hookPath, 'utf8');
+    if (!existing.includes(HOOK_MARKER)) continue;
+
+    const regex = new RegExp(`${HOOK_MARKER}[\\s\\S]*?${HOOK_END_MARKER}\\n?`, 'm');
+    const cleaned = existing.replace(regex, '').trim();
+
+    if (cleaned === '' || cleaned === '#!/bin/sh' || cleaned === '#!/usr/bin/env bash') {
+      fs.unlinkSync(hookPath);
+    } else {
+      fs.writeFileSync(hookPath, cleaned + '\n', { mode: 0o755 });
+    }
+    removed++;
+  }
+  return removed;
+}
+
+function samePath(a, b) {
+  if (!a || !b) return false;
+  const norm = (p) => path.resolve(p.replace(/^~(?=$|[\\/])/, process.env.HOME || process.env.USERPROFILE || '~'));
+  const x = norm(a);
+  const y = norm(b);
+  return process.platform === 'win32' || process.platform === 'darwin' ? x.toLowerCase() === y.toLowerCase() : x === y;
+}
+
 /**
- * Removes GitSafty hook
- * @param {string} [cwd] 
- * @returns {{ success: boolean, message: string }}
+ * Removes the GitSafty global hooks (~/.git-hooks-safty) and, when nothing
+ * else is left there, the global core.hooksPath that points to it.
  */
-function uninstallHook(cwd = process.cwd()) {
-  const hooksDir = getHooksDir(cwd);
-  if (!hooksDir) {
-    return { success: false, message: 'Git hooks directory not found.' };
+function uninstallGlobalHook() {
+  const { runGit } = require('./utils/git');
+  const dir = globalHooksDir();
+  const configured = runGit('config --global core.hooksPath');
+  const ours = samePath(configured, dir);
+
+  if (!fs.existsSync(dir) && !ours) {
+    return { success: true, message: 'GitSafty global hooks are not installed.' };
   }
 
   let removed = 0;
   try {
-    for (const type of HOOK_TYPES) {
-      const hookPath = path.join(hooksDir, type);
-      if (!fs.existsSync(hookPath)) continue;
-      const existing = fs.readFileSync(hookPath, 'utf8');
-      if (!existing.includes(HOOK_MARKER)) continue;
-
-      const regex = new RegExp(`${HOOK_MARKER}[\\s\\S]*?${HOOK_END_MARKER}\\n?`, 'm');
-      const cleaned = existing.replace(regex, '').trim();
-
-      if (cleaned === '' || cleaned === '#!/bin/sh' || cleaned === '#!/usr/bin/env bash') {
-        fs.unlinkSync(hookPath);
-      } else {
-        fs.writeFileSync(hookPath, cleaned + '\n', { mode: 0o755 });
-      }
-      removed++;
+    if (fs.existsSync(dir)) {
+      removed = stripHooksIn(dir);
+      if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
     }
+  } catch (err) {
+    return { success: false, message: `Failed to remove global hooks: ${err.message}` };
+  }
+
+  let unset = false;
+  if (ours && !fs.existsSync(dir)) {
+    runGit('config --global --unset core.hooksPath');
+    unset = true;
+  }
+
+  const parts = [`Removed ${removed} GitSafty global hook(s)`];
+  if (unset) parts.push('and reset git core.hooksPath');
+  else if (ours) parts.push(`(kept core.hooksPath: ${dir} still holds other hooks)`);
+  return { success: true, message: parts.join(' ') + '. Repositories on this PC are no longer scanned by GitSafty.' };
+}
+
+/**
+ * Removes GitSafty hooks.
+ * - isGlobal, or run outside a git repository: removes the global hooks.
+ * - inside a repository: removes this repository's own hooks.
+ * @param {string} [cwd]
+ * @param {boolean} [isGlobal=false]
+ * @returns {{ success: boolean, message: string }}
+ */
+function uninstallHook(cwd = process.cwd(), isGlobal = false) {
+  if (isGlobal || !isGitRepo(cwd)) return uninstallGlobalHook();
+
+  const { runGit } = require('./utils/git');
+  // The repository's own hooks dir, NOT the global core.hooksPath.
+  const localHooksPath = runGit('config --local core.hooksPath', cwd);
+  const gitDir = runGit('rev-parse --git-dir', cwd);
+  const hooksDir = localHooksPath ? path.resolve(cwd, localHooksPath) : path.resolve(cwd, gitDir, 'hooks');
+
+  let removed = 0;
+  try {
+    if (fs.existsSync(hooksDir)) removed = stripHooksIn(hooksDir);
   } catch (err) {
     return { success: false, message: `Failed to uninstall hook: ${err.message}` };
   }
 
-  if (!removed) return { success: true, message: 'GitSafty hook not present.' };
-  return { success: true, message: `GitSafty hooks removed successfully (${removed}).` };
+  const globalActive = samePath(runGit('config --global core.hooksPath', cwd), globalHooksDir());
+  const note = globalActive ? ' Global GitSafty hooks are still active for all repos (remove with: gitsafty uninstall --global).' : '';
+  if (!removed) return { success: true, message: `No GitSafty hooks in this repository.${note}` };
+  return { success: true, message: `GitSafty hooks removed from this repository (${removed}).${note}` };
 }
 
 /**
@@ -259,6 +324,7 @@ function refreshInstalledHooks() {
 module.exports = {
   installHook,
   uninstallHook,
+  uninstallGlobalHook,
   refreshInstalledHooks,
   generateHookContent,
   HOOK_TYPES,
