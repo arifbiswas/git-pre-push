@@ -13,6 +13,10 @@ describe('Self-refresh after updates (npm may skip postinstall)', () => {
     assert.ok(!isPermanentGlobalInstall('/Users/a/.npm/_npx/abc/node_modules/@arifbiswas/git-pre-push/bin/cli.js'));
     assert.ok(!isPermanentGlobalInstall('/work/app/node_modules/@arifbiswas/git-pre-push/bin/cli.js'));
     assert.ok(!isPermanentGlobalInstall('/Volumes/D/src/git-safty/bin/cli.js'));
+    // Windows: npm prefix, nvm-windows and Program Files are global; a project folder is not.
+    assert.ok(isPermanentGlobalInstall('C:/Users/a/AppData/Roaming/nvm/v20.11.0/node_modules/@arifbiswas/git-pre-push/bin/cli.js'));
+    assert.ok(isPermanentGlobalInstall('C:/Program Files/nodejs/node_modules/@arifbiswas/git-pre-push/bin/cli.js'));
+    assert.ok(!isPermanentGlobalInstall('C:/work/app/node_modules/@arifbiswas/git-pre-push/bin/cli.js'));
   });
 
   it('rewrites outdated hooks that belong to this copy, and nothing when up to date', () => {

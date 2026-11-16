@@ -348,7 +348,9 @@ function isPermanentGlobalInstall(cli = CLI_PATH) {
   return /\/node_modules\/@arifbiswas\/git-pre-push\/bin\/cli\.js$/.test(cli) &&
     !/\/_npx\//.test(cli) &&
     !/\/node_modules\/.+\/node_modules\//.test(cli) &&
-    /\/lib\/node_modules\/|\/npm\/node_modules\/|\/nodejs\/node_modules\/|^[A-Za-z]:\/.*\/node_modules\//.test(cli);
+    // unix prefix (nvm, Homebrew, /usr/local), Windows npm prefix (AppData/Roaming/npm),
+    // Program Files/nodejs, nvm-windows (AppData/Roaming/nvm/v20.x/node_modules).
+    /\/lib\/node_modules\/|\/npm\/node_modules\/|\/nodejs\/node_modules\/|\/nvm\/v[0-9][^/]*\/node_modules\//i.test(cli);
 }
 
 /**

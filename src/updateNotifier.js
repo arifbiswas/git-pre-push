@@ -275,17 +275,44 @@ function globalCliPath() {
  * re-runs init with the permanent copy so the hooks point there.
  * @param {string[]} initArgs e.g. ['init', '--global']
  */
-async function offerPermanentInstall(initArgs) {
-  if (installKind() !== 'npx') return;
+/**
+ * Offers to install GitSafty globally when this copy is not a global install:
+ *   - npx: runs from a temporary cache, no `gitsafty` command, hooks point
+ *     into that cache (which npm may delete)
+ *   - project dependency (`npm i @arifbiswas/git-pre-push` without -g):
+ *     only this project has it, no `gitsafty` command, other repos unprotected
+ * npm can't make a package install globally by itself, so GitSafty asks.
+ * Yes runs `npm install -g` and then `init` with the global copy.
+ * @param {string[]} initArgs init arguments to re-run with the global copy
+ * @param {{ kind?: string, remember?: boolean }} [opts]
+ */
+async function offerPermanentInstall(initArgs, opts = {}) {
+  const kind = opts.kind || installKind();
+  if (kind !== 'npx' && kind !== 'local-dependency') return;
   const isWin = process.platform === 'win32';
-  console.log(`${colors.yellow}${colors.bold}⚠ You ran GitSafty with npx.${colors.reset}`);
-  console.log(`  npx only runs it from a temporary cache: the ${colors.bold}gitsafty${colors.reset} command is not installed,`);
-  console.log(`  and the hooks point into that cache, which npm may delete later.`);
-  console.log(`  ${colors.dim}Install it permanently:${colors.reset} ${colors.cyan}npm install -g ${PACKAGE_NAME}${colors.reset} ${colors.dim}then${colors.reset} ${colors.cyan}gitsafty ${initArgs.join(' ')}${colors.reset}\n`);
+  const cache = readCache() || {};
+  const declinedRecently = opts.remember && cache.declinedGlobalAt && Date.now() - cache.declinedGlobalAt < 30 * 24 * 60 * 60 * 1000;
+  if (declinedRecently) return;
+
+  if (kind === 'npx') {
+    console.log(`${colors.yellow}${colors.bold}⚠ You ran GitSafty with npx.${colors.reset}`);
+    console.log(`  npx only runs it from a temporary cache: the ${colors.bold}gitsafty${colors.reset} command is not installed,`);
+    console.log(`  and the hooks point into that cache, which npm may delete later.`);
+  } else {
+    console.log(`${colors.yellow}${colors.bold}⚠ GitSafty is installed in this project only${colors.reset} ${colors.dim}(${path.resolve(__dirname, '..')})${colors.reset}`);
+    console.log(`  \`npm i\` without -g puts it in node_modules: no ${colors.bold}gitsafty${colors.reset} command, and other repos on this PC are not protected.`);
+  }
+  console.log(`  ${colors.dim}Install it for the whole PC:${colors.reset} ${colors.cyan}npm install -g ${PACKAGE_NAME}${colors.reset} ${colors.dim}then${colors.reset} ${colors.cyan}gitsafty ${initArgs.join(' ')}${colors.reset}\n`);
 
   if (!isInteractive() || process.env.GITSAFTY_NO_UPDATE_PROMPT === '1') return;
-  const yes = await askYesNo(`${colors.bold}${colors.cyan}? Install GitSafty permanently now (adds the gitsafty command)? (Y/n): ${colors.reset}`);
-  if (!yes) return;
+  const yes = await askYesNo(`${colors.bold}${colors.cyan}? Install GitSafty globally now (gitsafty command + protect every repo)? (Y/n): ${colors.reset}`);
+  if (!yes) {
+    if (opts.remember) {
+      writeCache(cache.latestVersion || null, { declinedGlobalAt: Date.now() });
+      console.log(`${colors.dim}OK, I won't ask again for 30 days.${colors.reset}\n`);
+    }
+    return;
+  }
   if (!installVersion('latest')) return;
 
   const cli = globalCliPath();
@@ -303,9 +330,24 @@ async function offerPermanentInstall(initArgs) {
   console.log('');
 }
 
+/**
+ * Fast check (no npm call) whether this copy might be a project dependency.
+ * Confirmed with installKind() before asking anything.
+ */
+function looksLikeProjectCopy() {
+  const cli = path.resolve(__dirname, '..', 'bin', 'cli.js').replace(/\\/g, '/');
+  if (!/\/node_modules\/@arifbiswas\/git-pre-push\/bin\/cli\.js$/.test(cli) || /\/_npx\//.test(cli)) return false;
+  try {
+    return !require('./installer').isPermanentGlobalInstall(cli);
+  } catch (_) {
+    return true;
+  }
+}
+
 module.exports = {
   isNewerVersion,
   offerPermanentInstall,
+  looksLikeProjectCopy,
   globalCliPath,
   installKind,
   offerUpdate,
