@@ -63,6 +63,17 @@ async function main() {
     } catch (_) {}
   }
 
+  // Installed as a project dependency (`npm i` without -g)? Offer the global
+  // install once per command run (remembered for 30 days when declined).
+  if (!hookCommands.includes(command) && command !== 'init' && command !== 'install') {
+    try {
+      const un = require('../src/updateNotifier');
+      if (un.looksLikeProjectCopy() && un.installKind() === 'local-dependency') {
+        await un.offerPermanentInstall(['init', '--global'], { kind: 'local-dependency', remember: true });
+      }
+    } catch (_) {}
+  }
+
   // `gitsafty update` does its own check below.
   if (!hookCommands.includes(command) && command !== 'update' && command !== 'upgrade') {
     // Opening the menu always asks the registry, so a fresh release is never missed.
@@ -317,7 +328,8 @@ async function main() {
         console.log(`${colors.cyan}Your git environment is now protected!${colors.reset}`);
         console.log(`${colors.dim}Every git push, clone and pull${isGlobalFlag ? ' on this PC' : ' in this repository'} is scanned for malware & secret leaks.${colors.reset}\n`);
         const { offerPermanentInstall } = require('../src/updateNotifier');
-        await offerPermanentInstall(['init', ...(isGlobalFlag ? ['--global'] : [])]);
+        // npx copy: re-run the same init globally. Project copy: protect the whole PC.
+        await offerPermanentInstall(['init', '--global']);
       } else {
         console.error(`\n${colors.red}${colors.bold}✖ ${result.message}${colors.reset}\n`);
         process.exit(1);

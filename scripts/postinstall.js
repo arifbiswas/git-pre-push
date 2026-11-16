@@ -20,6 +20,12 @@ function main() {
     console.log(`[git-safty] 🛡️ Global hooks updated (push + clone + pull malware scan) in ${refreshed}`);
   }
 
+  if (!isGlobalInstall) {
+    // npm can't make a package install globally on its own; say it clearly.
+    console.log('[git-safty] Installed in this project only. To protect every repo on this PC and get the `gitsafty` command:');
+    console.log('[git-safty]   npm install -g @arifbiswas/git-pre-push && gitsafty init --global');
+  }
+
   // When installed as a dependency, process.env.INIT_CWD points to the parent project
   const targetDir = process.env.INIT_CWD || process.cwd();
 

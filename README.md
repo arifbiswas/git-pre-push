@@ -30,6 +30,14 @@ Whenever `git push` is invoked—from terminal, VS Code UI, or any Git GUI—it 
 
 ## 🚀 Quick Start
 
+> **Install globally (`-g`).** `npm i @arifbiswas/git-pre-push` without `-g` only puts GitSafty into that project's `node_modules`: there is no `gitsafty` command and other repos stay unprotected. npm does not let a package install itself globally, so when GitSafty notices it is running from a project (or from `npx`) it asks *"Install GitSafty globally now? (Y/n)"* and does it for you. The recommended command is:
+>
+> ```bash
+> npm install -g @arifbiswas/git-pre-push
+> gitsafty init --global
+> ```
+
+
 ### Option 1: Automatic Setup via npm (Recommended)
 
 Add `git-pre-push` to your project:
