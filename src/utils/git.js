@@ -101,10 +101,10 @@ function parsePrePushInput(stdinText) {
  */
 function getChangedFiles(diffRange, cwd = process.cwd()) {
   // Use git diff-tree or git log to extract changed filenames
-  const output = runGit(`diff-tree --no-commit-id --name-only -r ${diffRange}`, cwd);
+  const output = runGit(`diff-tree --no-commit-id --name-only --diff-filter=d -r ${diffRange}`, cwd);
   if (!output) {
     // Fallback to git log
-    const logOutput = runGit(`log ${diffRange} --name-only --oneline`, cwd);
+    const logOutput = runGit(`log ${diffRange} --name-only --oneline --diff-filter=d`, cwd);
     if (!logOutput) return [];
     const files = new Set();
     for (const line of logOutput.split('\n')) {

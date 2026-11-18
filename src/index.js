@@ -259,6 +259,46 @@ async function runPrePush() {
 
   const pushes = parsePrePushInput(stdinData);
 
+  // .env must never reach the remote: block, then fix (ignore + remove from unpushed commits).
+  if (pushes.length && loadConfig(process.cwd()).envGuard !== false) {
+    const { guardEnvOnPush } = require('./envGuard');
+    let env;
+    try {
+      env = guardEnvOnPush(pushes, process.cwd());
+    } catch (err) {
+      env = { blocked: true, files: ['.env'], fixes: [], manual: [`Automatic fix failed (${err.message}). Run: git rm --cached .env && echo .env >> .gitignore && git commit -am "Remove .env"`] };
+    }
+    if (env.blocked) {
+      console.log(`\n${colors.red}${colors.bold}✖ PUSH BLOCKED: .env file in this push${colors.reset} ${colors.dim}(${env.files.join(', ')})${colors.reset}`);
+      console.log(`${colors.dim}.env files hold passwords and API keys. GitSafty never lets them reach the remote.${colors.reset}\n`);
+      for (const f of env.fixes) console.log(`  ${colors.green}✔${colors.reset} ${f}`);
+      for (const m of env.manual) console.log(`  ${colors.yellow}⚠${colors.reset} ${m}`);
+      if (env.alreadyOnRemote) {
+        console.log(`  ${colors.yellow}⚠ The remote already had a .env from an earlier push. This push removes it, but it is still in the remote's history: change (rotate) every key in it.${colors.reset}`);
+      }
+      // Push the cleaned commits now (once; the inner push runs the hooks again).
+      const remote = process.argv[3];
+      const config = loadConfig(process.cwd());
+      let pushed = false;
+      if (remote && !env.manual.length && env.repush.length && !process.env.GITSAFTY_ENV_REPUSH && config.envGuardAutoPush !== false) {
+        console.log(`\n${colors.cyan}Pushing the fixed commits (without .env) to ${remote}...${colors.reset}`);
+        const r = require('child_process').spawnSync('git', ['push', remote, ...env.repush.map(p => `${p.ref}:${p.remoteRef}`)], {
+          stdio: 'inherit',
+          env: { ...process.env, GITSAFTY_ENV_REPUSH: '1' }
+        });
+        pushed = r.status === 0;
+      }
+      if (pushed) {
+        console.log(`\n${colors.green}${colors.bold}✔ Fixed and pushed without .env.${colors.reset}`);
+        console.log(`${colors.dim}Git prints "failed to push" below for the ORIGINAL push (the one with .env). That one was stopped on purpose; your code is on the remote.${colors.reset}\n`);
+      } else {
+        console.log(`\n${colors.bold}Now run ${colors.cyan}git push${colors.reset}${colors.bold} again.${colors.reset}${env.manual.length ? '' : ' Nothing else to do.'}\n`);
+      }
+      notifyDesktop('GitSafty: .env blocked', pushed ? '.env was removed and your code was pushed without it.' : `.env was kept out of the push${env.manual.length ? '' : ' and fixed automatically'}.`);
+      process.exit(1);
+    }
+  }
+
   let allFiles = [];
   let combinedDiff = '';
 

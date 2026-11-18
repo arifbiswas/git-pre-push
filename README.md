@@ -241,6 +241,26 @@ Limits, honestly: the chip stops token theft (copying files, Keychain or browser
 
 ---
 
+## 🔒 .env never reaches GitHub
+
+When a `git push` contains a `.env` file (`.env`, `.env.local`, `.env.production` …), GitSafty stops the push and fixes it for you:
+
+1. Adds `.env` patterns to `.gitignore`. `.env.example`, `.env.sample` and `.env.template` stay allowed.
+2. Untracks a `.env` that git still keeps in its cache, even when `.gitignore` already lists it (`git rm --cached`). The file stays on your disk.
+3. Removes the `.env` from every commit that is **not on the remote yet**, so it is not in the pushed history either. A commit that only added the `.env` is dropped. Your uncommitted changes are not touched.
+4. Commits the `.gitignore` change and **pushes the cleaned branch right away**.
+
+Git then prints `failed to push` for the original push, the one that still had the `.env`. That is expected: your code is already on the remote without it.
+
+Notes:
+
+- The rewritten unpushed commits get new ids, and signed commits lose their signature.
+- If a `.env` was already pushed earlier, the next push deletes it from the remote, but it stays in the remote's history. **Change every key in it.**
+- With merge commits in the unpushed range, GitSafty blocks the push and shows the commands instead.
+- Turn it off per repository in `.gitsafetyrc.json`: `"envGuard": false`. To keep the fix but skip the automatic push, use `"envGuardAutoPush": false`.
+
+---
+
 ## 🧪 Full Scan (everything in a folder, archives too)
 
 The normal scan and the Advanced Scanner work on projects. **Full Scan** checks *everything* in a folder: projects that were never connected to git, downloads, backups, and the files **inside archives**.
