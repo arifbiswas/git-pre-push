@@ -336,6 +336,8 @@ function runManualScan() {
 
   if (!isGitRepo()) {
     console.error(`${colors.red}Error: Current directory is not a git repository.${colors.reset}`);
+    console.error(`${colors.dim}To scan a plain folder, zip files or projects that are not git repositories, use Full Scan:${colors.reset}`);
+    console.error(`  ${colors.cyan}gitsafty full-scan .${colors.reset}   ${colors.dim}(add --clean to remove confirmed malware)${colors.reset}\n`);
     process.exit(1);
   }
 
