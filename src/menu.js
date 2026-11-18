@@ -25,38 +25,38 @@ function ask(question) {
 async function runInteractiveMenu() {
   banner();
 
-  const item = (n, icon, title, desc) =>
-    console.log(`  ${colors.green}[${n}]${colors.reset}${String(n).length === 1 ? ' ' : ''} ${icon}  ${colors.bold}${title.padEnd(24)}${colors.reset} - ${desc}`);
-  const section = (title) => console.log(`\n  ${colors.dim}── ${title} ──${colors.reset}`);
+  const item = (n, title, desc) =>
+    console.log(`  ${colors.green}${String(n).padStart(2)}.${colors.reset} ${colors.bold}${title.padEnd(34)}${colors.reset} ${colors.dim}${desc}${colors.reset}`);
+  const section = (title) => console.log(`\n  ${colors.cyan}${title}${colors.reset}`);
 
-  console.log(`\n${colors.bold}${colors.cyan}Select an action to perform:${colors.reset}`);
+  console.log(`\n${colors.bold}What do you want to do?${colors.reset}`);
 
-  section('Protection');
-  item(1, '🛡️ ', 'Install Local Hook', 'Protect current repo (push + checkout + pull)');
-  item(2, '🌐', 'Install Global Hook', 'Protect EVERY repo on this PC: scan on clone, pull & push');
-  item(17, '🔁', 'Scan Every Pull', 'Also scan when git pull says "Already up to date"');
-  item(8, '❌', 'Uninstall Hook', 'Remove GitSafty hooks (this repo or whole PC)');
+  section('Protect your code');
+  item(1, 'Protect this project', 'Check every push, clone and pull in this project');
+  item(2, 'Protect all projects on this PC', 'Same, for every git project on this computer');
+  item(3, 'Scan every git pull', 'Also when git says "Already up to date" (on/off)');
+  item(4, 'Remove protection', 'Uninstall GitSafty from this project or this PC');
 
-  section('Malware scan & removal');
-  item(3, '🔍', 'Scan Local Workspace', 'Deep scan this repo, auto-remove confirmed malware');
-  item(16, '🔬', 'Advanced Scanner', 'Audit ALL projects in a folder: malware, backdoors, secrets');
-  item(18, '🧪', 'Full Scan', 'EVERYTHING in a folder: non-git projects + zip/tar/7z/rar');
-  item(10, '🧹', 'Sweep All Repos', 'Scan every git repo in a folder (whole device)');
-  item(5, '🗑️ ', 'Clean & Quarantine', 'Remove confirmed malware + trojan scripts here');
-  item(4, '🚀', 'Scan Remote GitHub Repo', 'Zero-clone audit (no download/clone)');
+  section('Scan and clean');
+  item(5, 'Scan this project', 'Find malware here and remove it automatically');
+  item(6, 'Scan all projects in a folder', 'Malware, hidden backdoors and leaked passwords/keys');
+  item(7, 'Scan everything in a folder', 'Also zip/rar files and folders that are not git projects');
+  item(8, 'Scan all git repos under a folder', 'Quick malware check, e.g. your whole disk');
+  item(9, 'Clean this project', 'Move malware files in this project to quarantine');
+  item(10, 'Scan a GitHub repo before cloning', 'Check a GitHub link without downloading it');
 
-  section('GitHub login vault (device stays logged out)');
-  item(11, '🔐', 'Vault Setup', 'Encrypt token with Touch ID / Windows Hello / passphrase');
-  item(12, '📋', 'Vault Status', 'Check vault, credential helper & SSH keys');
-  item(13, '🔓', 'Vault Test Unlock', 'Try one unlock prompt (token is not used)');
-  item(14, '🚫', 'Vault Remove', 'Back to normal git login');
+  section('Safe GitHub login (stay logged out)');
+  item(11, 'Turn on safe GitHub login', 'Touch ID / Windows Hello / password before every push');
+  item(12, 'Check safe login status', 'See if your GitHub login is protected');
+  item(13, 'Test safe login', 'Try the unlock prompt once');
+  item(14, 'Turn off safe login', 'Go back to normal git login');
 
-  section('Other');
-  item(6, '⚡', 'Run Push Intercept Demo', 'Simulate a blocked malware push');
-  item(7, '🤖', 'Setup GitHub Action CI', 'Guard repository on GitHub server-side');
-  item(9, '🔄', 'Check for Updates', 'Check if a new version is available on npm');
-  item(15, '🩺', 'Doctor', 'Something broken? Find it and show/apply the fix');
-  console.log(`  ${colors.dim}[0]  🚪  Exit${colors.reset}\n`);
+  section('Help and tools');
+  item(15, 'Fix problems', 'Find what is broken and how to fix it');
+  item(16, 'Check for updates', 'Install the newest GitSafty');
+  item(17, 'Add GitSafty to GitHub Actions', 'Check every push on GitHub too');
+  item(18, 'See a demo', 'Show what a blocked push looks like');
+  console.log(`\n  ${colors.dim} 0. Exit${colors.reset}\n`);
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -64,7 +64,7 @@ async function runInteractiveMenu() {
   });
 
   const choice = await new Promise((resolve) => {
-    rl.question(`${colors.bold}${colors.yellow}Enter your choice (1-18, 0 to exit): ${colors.reset}`, (ans) => {
+    rl.question(`${colors.bold}${colors.yellow}Enter a number (0-18): ${colors.reset}`, (ans) => {
       rl.close();
       resolve(ans.trim());
     });
@@ -93,12 +93,12 @@ async function runInteractiveMenu() {
       break;
     }
 
-    case '3': {
+    case '5': {
       runManualScan();
       break;
     }
 
-    case '4': {
+    case '10': {
       const askRl = readline.createInterface({
         input: process.stdin,
         output: process.stdout
@@ -128,7 +128,7 @@ async function runInteractiveMenu() {
       break;
     }
 
-    case '5': {
+    case '9': {
       console.log(`\n${colors.cyan}Scanning workspace for injected malware scripts to quarantine...${colors.reset}`);
       const { getAllRepoFiles } = require('./utils/git');
       scanAndCleanRepo(getAllRepoFiles(), process.cwd(), { reason: 'clean' });
@@ -145,7 +145,7 @@ async function runInteractiveMenu() {
       break;
     }
 
-    case '6': {
+    case '18': {
       console.log(`\n${colors.cyan}Simulating a malicious push intercept test...${colors.reset}\n`);
       const mockFiles = ['src/app.js', 'temp_auto_push.bat', '.vscode/tasks.json'];
       const mockDiff = `+ powershell.exe -enc SQBFAFgAIAAoAE4AZQB3...
@@ -159,7 +159,7 @@ async function runInteractiveMenu() {
       break;
     }
 
-    case '7': {
+    case '17': {
       const res = setupGitHubAction();
       if (res.success) {
         console.log(`\n${colors.green}${colors.bold}✔ ${res.message}${colors.reset}\n`);
@@ -169,7 +169,7 @@ async function runInteractiveMenu() {
       break;
     }
 
-    case '8': {
+    case '4': {
       const { isGitRepo } = require('./utils/git');
       let global = !isGitRepo(process.cwd());
       if (!global) {
@@ -185,14 +185,14 @@ async function runInteractiveMenu() {
       break;
     }
 
-    case '9': {
+    case '16': {
       const pkg = require('../package.json');
       const { checkUpdateManual } = require('./updateNotifier');
       await checkUpdateManual(pkg.version);
       break;
     }
 
-    case '10': {
+    case '8': {
       const folder = await ask(`\n${colors.bold}${colors.cyan}? Folder to sweep (Enter = ${process.cwd()}): ${colors.reset}`);
       const removeAnswer = await ask(`${colors.bold}${colors.cyan}? Automatically remove CONFIRMED malware? Suspicious items are never touched. (Y/n): ${colors.reset}`);
       const clean = !/^n(o)?$/i.test(removeAnswer);
@@ -235,7 +235,7 @@ async function runInteractiveMenu() {
       break;
     }
 
-    case '16': {
+    case '6': {
       const { runAdvancedScan } = require('./advancedScanner');
       const folder = await ask(`\n${colors.bold}${colors.cyan}? Folder that contains your projects (Enter = ${process.cwd()}): ${colors.reset}`);
       const deep = await ask(`${colors.bold}${colors.cyan}? Deep scan incl. node_modules & ignored files? Slower. (y/N): ${colors.reset}`);
@@ -247,7 +247,7 @@ async function runInteractiveMenu() {
       break;
     }
 
-    case '17': {
+    case '3': {
       const shell = require('./shellIntegration');
       const on = shell.shellIntegrationStatus().installed.length > 0;
       const answer = await ask(`\n${colors.bold}${colors.cyan}? Pull scan is ${on ? 'ON' : 'OFF'}. Turn it ${on ? 'off' : 'on'}? (y/N): ${colors.reset}`);
@@ -263,7 +263,7 @@ async function runInteractiveMenu() {
       break;
     }
 
-    case '18': {
+    case '7': {
       const { runFullScan } = require('./fullScanner');
       const folder = await ask(`\n${colors.bold}${colors.cyan}? Folder to scan completely (Enter = ${process.cwd()}): ${colors.reset}`);
       const clean = await ask(`${colors.bold}${colors.cyan}? Automatically remove CONFIRMED malware? An infected archive is moved to quarantine whole (backup kept). (Y/n): ${colors.reset}`);
@@ -273,7 +273,7 @@ async function runInteractiveMenu() {
 
     case '0':
     default:
-      console.log(`\n${colors.dim}Goodbye! 🛡️${colors.reset}\n`);
+      console.log(`\n${colors.dim}Goodbye!${colors.reset}\n`);
       break;
   }
 }

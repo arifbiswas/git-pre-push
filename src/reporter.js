@@ -28,7 +28,7 @@ const symbols = {
 
 function banner() {
   console.log(`\n${colors.cyan}${colors.bold}================================================================${colors.reset}`);
-  console.log(`${colors.cyan}${colors.bold}       ${symbols.shield} GitSafty: Pre-Push Malware & Secret Guard        ${colors.reset}`);
+  console.log(`${colors.cyan}${colors.bold}          GitSafty: Malware & Secret Guard for Git${colors.reset}`);
   console.log(`${colors.cyan}${colors.bold}================================================================${colors.reset}`);
 }
 
