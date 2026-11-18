@@ -237,6 +237,8 @@ function scanProject(dir, { deep = false } = {}) {
     path: dir,
     git: isGitRepo(dir),
     files: files.length,
+    // Archives are not opened here; Full Scan (gitsafty full-scan) looks inside them.
+    archives: files.filter(f => !inGeneratedDir(f) && require('./archive').isArchiveName(f)).length,
     durationMs: Date.now() - started,
     findings,
     summary: {
@@ -418,6 +420,10 @@ function runAdvancedScan(root, { clean = false, deep = false, json = false } = {
     console.log(`  ${removedTotal ? colors.green : colors.dim}Files cleaned    : ${removedTotal}${colors.reset}`);
     console.log(`  ${colors.green}Clean projects   : ${results.filter(r => !r.findings.length).length}${colors.reset}`);
     console.log(`\n  ${colors.dim}Full report: ${reportPath}${colors.reset}`);
+    const archiveCount = results.reduce((n, r) => n + (r.archives || 0), 0);
+    if (archiveCount) {
+      console.log(`  ${colors.yellow}${archiveCount} archive file(s) (zip/tar/7z/rar …) were not opened.${colors.reset} Look inside them: ${colors.cyan}gitsafty full-scan "${abs}"${colors.reset}`);
+    }
     if (infected.length && !clean) {
       console.log(`\n  ${colors.bold}Remove the confirmed malware:${colors.reset} ${colors.cyan}gitsafty scan-projects "${abs}" --clean${colors.reset}`);
     }

@@ -86,6 +86,7 @@ Select an action to perform:
   ── Malware scan & removal ──
   [3]  🔍  Scan Local Workspace     - Deep scan this repo, auto-remove confirmed malware
   [16] 🔬  Advanced Scanner         - Audit ALL projects in a folder: malware, backdoors, secrets
+  [18] 🧪  Full Scan                - EVERYTHING in a folder: non-git projects + zip/tar/7z/rar
   [10] 🧹  Sweep All Repos          - Scan every git repo in a folder (whole device)
   [5]  🗑️   Clean & Quarantine       - Remove confirmed malware + trojan scripts here
   [4]  🚀  Scan Remote GitHub Repo  - Zero-clone audit (no download/clone)
@@ -240,6 +241,28 @@ Limits, honestly: the chip stops token theft (copying files, Keychain or browser
 
 ---
 
+## 🧪 Full Scan (everything in a folder, archives too)
+
+The normal scan and the Advanced Scanner work on projects. **Full Scan** checks *everything* in a folder: projects that were never connected to git, downloads, backups, and the files **inside archives**.
+
+```bash
+gitsafty full-scan ~/Downloads            # report only
+gitsafty full-scan ~/Downloads --clean    # also remove CONFIRMED malware
+gitsafty full-scan ./some-file.zip        # a single archive
+gitsafty full-scan ~/projects --json      # machine-readable output
+```
+
+- **Every file**, git repository or not. Git backdoors are checked in every repository it passes.
+- **Inside archives**: zip, jar, war, apk, aab, aar, ipa, xpi, vsix, nupkg, whl, crx, docx/xlsx/pptx, tar, tar.gz/tgz, gz, and also archives inside archives. Archives are found by their first bytes, so a renamed one is still opened. Nothing is extracted to disk and nothing inside is run.
+- **7z, rar, bz2, xz, cab**: read through the system `bsdtar` (built into macOS and Windows 10+) or 7-Zip if it is installed. If neither can open it, the report says so.
+- **Password-protected archives** can't be read. One that contains programs (`.exe`, `.js`, `.bat` …) is flagged, because malware is often sent that way.
+- **Skipped**: `node_modules`, composer `vendor`, `Pods`, virtualenvs, `.gradle`, package caches and lock files (`package-lock.json`, `composer.lock` …). These are downloaded packages, not your code. `package.json` and `composer.json` are still checked, because malicious install scripts live there.
+- Zip-bomb safe: at most 64 MB per file inside an archive, 1 GB per archive, 4 levels of nesting.
+
+With `--clean`, a loose file is repaired or removed exactly like on clone and pull. An **archive with malware inside is moved to quarantine whole**, because an archive can't be safely rewritten. Read-only backups and a report go to `~/.gitsafty/quarantine/full-scan-<time>/`. At the end you see each infected archive or folder, what was found, what was removed, and what still needs review. Menu option **[18]**.
+
+---
+
 ## 🔬 Advanced Scanner (many projects at once)
 
 Got a folder with 20 projects? Audit all of them in one go:
@@ -317,6 +340,7 @@ git config --global --remove-section credential.https://github.com   # only if y
 | `npx @arifbiswas/git-pre-push demo` | Simulates a blocked push in terminal |
 | `npx @arifbiswas/git-pre-push action` | Generates a `.github/workflows/git-safty.yml` CI workflow |
 | `npx @arifbiswas/git-pre-push scan-projects <folder>` | **Advanced Scanner**: audit every project in a folder (malware, git backdoors, IDE, secrets) |
+| `npx @arifbiswas/git-pre-push full-scan <folder> [--clean]` | **Full Scan**: everything in a folder, also non-git projects and inside zip/jar/apk/tar/gz/7z/rar |
 | `npx @arifbiswas/git-pre-push pull-scan on\|off` | Scan after every `git pull`, also when "Already up to date" (adds a shell `git` function) |
 | `npx @arifbiswas/git-pre-push doctor [--fix]` | Finds broken/outdated installs and shows (or applies) the exact fix |
 | `npx @arifbiswas/git-pre-push uninstall` | Cleanly removes the hook from `.git/hooks` |

@@ -40,6 +40,7 @@ async function runInteractiveMenu() {
   section('Malware scan & removal');
   item(3, '🔍', 'Scan Local Workspace', 'Deep scan this repo, auto-remove confirmed malware');
   item(16, '🔬', 'Advanced Scanner', 'Audit ALL projects in a folder: malware, backdoors, secrets');
+  item(18, '🧪', 'Full Scan', 'EVERYTHING in a folder: non-git projects + zip/tar/7z/rar');
   item(10, '🧹', 'Sweep All Repos', 'Scan every git repo in a folder (whole device)');
   item(5, '🗑️ ', 'Clean & Quarantine', 'Remove confirmed malware + trojan scripts here');
   item(4, '🚀', 'Scan Remote GitHub Repo', 'Zero-clone audit (no download/clone)');
@@ -63,7 +64,7 @@ async function runInteractiveMenu() {
   });
 
   const choice = await new Promise((resolve) => {
-    rl.question(`${colors.bold}${colors.yellow}Enter your choice (1-17, 0 to exit): ${colors.reset}`, (ans) => {
+    rl.question(`${colors.bold}${colors.yellow}Enter your choice (1-18, 0 to exit): ${colors.reset}`, (ans) => {
       rl.close();
       resolve(ans.trim());
     });
@@ -259,6 +260,14 @@ async function runInteractiveMenu() {
           console.log(`\n${colors.green}✔ Every git pull is now scanned (${r.files.join(', ')}).${colors.reset} Load it: ${colors.cyan}${shell.reloadHint()}${colors.reset}\n`);
         }
       }
+      break;
+    }
+
+    case '18': {
+      const { runFullScan } = require('./fullScanner');
+      const folder = await ask(`\n${colors.bold}${colors.cyan}? Folder to scan completely (Enter = ${process.cwd()}): ${colors.reset}`);
+      const clean = await ask(`${colors.bold}${colors.cyan}? Automatically remove CONFIRMED malware? An infected archive is moved to quarantine whole (backup kept). (Y/n): ${colors.reset}`);
+      runFullScan(folder || process.cwd(), { clean: !/^n(o)?$/i.test(clean) });
       break;
     }
 

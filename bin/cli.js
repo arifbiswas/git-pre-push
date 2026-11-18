@@ -153,6 +153,19 @@ async function main() {
       break;
     }
 
+    case 'full-scan':
+    case 'fullscan':
+    case 'scan-folder': {
+      banner();
+      const { runFullScan } = require('../src/fullScanner');
+      const target = args.find((a, i) => i > 0 && !a.startsWith('-')) || process.cwd();
+      process.exit(runFullScan(target, {
+        clean: args.includes('--clean'),
+        json: args.includes('--json')
+      }));
+      break;
+    }
+
     case 'doctor':
     case 'fix-install': {
       banner();
@@ -379,6 +392,7 @@ ${colors.bold}Commands:${colors.reset}
   ${colors.green}vault test${colors.reset}   Try one unlock (prompt) without using the token
   ${colors.green}vault remove${colors.reset} Turn the vault off and go back to normal git login
   ${colors.green}scan-projects${colors.reset} <folder>  Advanced Scanner: audit EVERY project in a folder at once
+  ${colors.green}full-scan${colors.reset} <folder>  Full Scan: EVERYTHING in a folder, also non-git projects and inside zip/jar/apk/tar/gz/7z/rar (--clean removes)
                (malware, git backdoors, IDE auto-run, secrets) [--clean] [--deep] [--json]
   ${colors.green}pull-scan${colors.reset} on|off  Scan after EVERY git pull, also "Already up to date" (adds a git shell function)
   ${colors.green}doctor${colors.reset}       Find broken/outdated installs and show the exact fix (--fix applies it)
