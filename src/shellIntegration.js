@@ -6,7 +6,10 @@
  * git, keeps its exit code, and after `git pull` runs `gitsafty scan-pull`
  * (which skips the scan when a hook already scanned the same commit).
  *
- * Installed only when the user agrees, between clear markers, in:
+ * On by default with the global install (`init --global`, and on update for
+ * existing global installs). `gitsafty pull-scan off` removes it and is
+ * remembered, so it is never added back by itself. It is written between
+ * clear markers, in:
  *   macOS / Linux: the current shell's rc file (~/.zshrc, ~/.bashrc, fish config)
  *   Windows: PowerShell profiles, and ~/.bashrc for Git Bash
  */
@@ -149,11 +152,21 @@ function stripBlock(text) {
   return text.replace(re, '\n').replace(/\n{3,}$/, '\n\n');
 }
 
+// Written when the user turns pull scan off, so the default never turns it back on.
+function optOutFile() {
+  return path.join(home(), '.gitsafty', 'pull-scan-off');
+}
+
+function isOptedOut() {
+  return fs.existsSync(optOutFile());
+}
+
 /**
  * Adds (or refreshes) the git wrapper.
  * @returns {{ files: string[] }}
  */
 function installShellIntegration() {
+  try { fs.rmSync(optOutFile(), { force: true }); } catch (_) {}
   const files = [];
   for (const t of targets()) {
     const exists = fs.existsSync(t.file);
@@ -167,8 +180,18 @@ function installShellIntegration() {
   return { files };
 }
 
-/** Removes the git wrapper everywhere it was added. @returns {{ files: string[] }} */
-function removeShellIntegration() {
+/**
+ * Removes the git wrapper everywhere it was added.
+ * @param {{ optOut?: boolean }} [opts] optOut: the user turned it off; remember that
+ * @returns {{ files: string[] }}
+ */
+function removeShellIntegration({ optOut = false } = {}) {
+  if (optOut) {
+    try {
+      fs.mkdirSync(path.dirname(optOutFile()), { recursive: true });
+      fs.writeFileSync(optOutFile(), `Turned off on ${new Date().toISOString()}. Turn on again: gitsafty pull-scan on\n`);
+    } catch (_) {}
+  }
   const files = [];
   for (const t of targets()) {
     if (!fs.existsSync(t.file)) continue;
@@ -198,7 +221,29 @@ function refreshShellIntegration() {
 
 function shellIntegrationStatus() {
   const installed = targets().filter(t => fs.existsSync(t.file) && fs.readFileSync(t.file, 'utf8').includes(START)).map(t => t.file);
-  return { installed, cliExists: fs.existsSync(cliPath()) };
+  return { installed, cliExists: fs.existsSync(cliPath()), optedOut: isOptedOut() };
+}
+
+/** True when GitSafty's global hooks are active on this PC. */
+function globalHooksActive() {
+  const r = spawnSync('git', ['config', '--global', '--get', 'core.hooksPath'], { encoding: 'utf8' });
+  const value = (r.stdout || '').trim();
+  if (!value) return false;
+  const expanded = value.replace(/^~(?=$|[\\/])/, home());
+  return path.resolve(expanded) === path.resolve(home(), '.git-hooks-safty');
+}
+
+/**
+ * Pull scan is on by default for global installs. Turns it on unless the
+ * user turned it off before, it is already on, or this is CI.
+ * @param {{ onlyIfGlobalHooks?: boolean }} [opts]
+ * @returns {string[]} files it was added to (empty when nothing changed)
+ */
+function enableByDefault({ onlyIfGlobalHooks = false } = {}) {
+  if (process.env.CI || process.env.GITSAFTY_NO_PULL_SCAN === '1' || isOptedOut()) return [];
+  if (shellIntegrationStatus().installed.length) return [];
+  if (onlyIfGlobalHooks && !globalHooksActive()) return [];
+  return installShellIntegration().files;
 }
 
 /** Command that loads the change in the current terminal. */
@@ -222,6 +267,8 @@ module.exports = {
   removeShellIntegration,
   refreshShellIntegration,
   shellIntegrationStatus,
+  enableByDefault,
+  isOptedOut,
   reloadHint,
   posixBlock,
   powershellBlock,

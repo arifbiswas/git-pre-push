@@ -34,7 +34,7 @@ async function runInteractiveMenu() {
   section('Protect your code');
   item(1, 'Protect this project', 'Check every push, clone and pull in this project');
   item(2, 'Protect all projects on this PC', 'Same, for every git project on this computer');
-  item(3, 'Scan every git pull', 'Also when git says "Already up to date" (on/off)');
+  item(3, 'Scan every git pull', 'On by default, also "Already up to date". Turn off/on');
   item(4, 'Remove protection', 'Uninstall GitSafty from this project or this PC');
 
   section('Scan and clean');
@@ -87,6 +87,12 @@ async function runInteractiveMenu() {
       const res = installHook(process.cwd(), true);
       if (res.success) {
         console.log(`\n${colors.green}${colors.bold}✔ ${res.message}${colors.reset}\n`);
+        // Pull scan is on by default (unless the user turned it off before).
+        const shell = require('./shellIntegration');
+        const added = shell.enableByDefault();
+        if (added.length) {
+          console.log(`${colors.green}✔ Every git pull is scanned${colors.reset} ${colors.dim}(also "Already up to date"). Open a new terminal. Turn off: option 3${colors.reset}\n`);
+        }
       } else {
         console.error(`\n${colors.red}${colors.bold}✖ ${res.message}${colors.reset}\n`);
       }
@@ -253,7 +259,7 @@ async function runInteractiveMenu() {
       const answer = await ask(`\n${colors.bold}${colors.cyan}? Pull scan is ${on ? 'ON' : 'OFF'}. Turn it ${on ? 'off' : 'on'}? (y/N): ${colors.reset}`);
       if (/^y(es)?$/i.test(answer)) {
         if (on) {
-          const r = shell.removeShellIntegration();
+          const r = shell.removeShellIntegration({ optOut: true });
           console.log(`\n${colors.yellow}✔ Turned off (${r.files.join(', ')}). Open a new terminal.${colors.reset}\n`);
         } else {
           const r = shell.installShellIntegration();
