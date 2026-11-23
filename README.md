@@ -36,7 +36,7 @@ That's it. Every git project on this computer is now protected.
 
 - Use `-g`. Without it GitSafty only lands inside one project and the `gitsafty` command does not exist. If you forget, GitSafty asks to install itself globally the first time it runs.
 - **Windows: `'gitsafty' is not recognized`?** Open a new terminal. Still not found? Add the folder shown by `npm config get prefix` to your `Path`.
-- After `init --global`, GitSafty offers one extra step: checking pulls that say *"Already up to date"* too. Answer `y` for full coverage.
+- `init --global` also turns on the check for pulls that say *"Already up to date"*. Open a new terminal once so it takes effect.
 
 Protect only one project instead:
 
@@ -57,7 +57,7 @@ What do you want to do?
   Protect your code
    1. Protect this project               Check every push, clone and pull in this project
    2. Protect all projects on this PC    Same, for every git project on this computer
-   3. Scan every git pull                Also when git says "Already up to date" (on/off)
+   3. Scan every git pull                On by default, also "Already up to date". Turn off/on
    4. Remove protection                  Uninstall GitSafty from this project or this PC
 
   Scan and clean
@@ -99,19 +99,21 @@ After `gitsafty init --global` you don't need to do anything. Use git as usual:
 
 When something is removed, you see what it was and where the backup is. Files inside a project are changed only in your working folder: check `git status`, then commit the clean version.
 
-### Scan every pull
+### Scan every pull (on by default)
 
-Git runs nothing when a pull says *"Already up to date"*. To check those pulls too:
+Git runs nothing when a pull says *"Already up to date"*, so GitSafty adds a small `git` helper to your shell profile (`.zshrc`, `.bashrc`, fish or PowerShell) that checks those pulls too. It is **on by default** with the global install, and existing installs get it after updating. Open a new terminal once so it takes effect.
 
-```bash
-gitsafty pull-scan on
-```
+Don't want it? Turn it off. GitSafty remembers this and never turns it back on by itself:
 
 ```bash
 gitsafty pull-scan off
 ```
 
-Open a new terminal afterwards. Menu option **3** does the same.
+```bash
+gitsafty pull-scan on
+```
+
+Menu option **3** does the same. Pulls that bring new code are always checked, even with this off.
 
 ---
 
@@ -286,7 +288,7 @@ git config --global --remove-section credential.https://github.com
 | `gitsafty init --global` | Protect every project on this computer |
 | `gitsafty init` | Protect only this project |
 | `gitsafty uninstall` | Remove protection from this project (`--global` for the whole computer) |
-| `gitsafty pull-scan on` / `off` | Also check pulls that say "Already up to date" |
+| `gitsafty pull-scan off` / `on` | Check pulls that say "Already up to date" (on by default) |
 | `gitsafty scan` | Scan this project and remove confirmed malware |
 | `gitsafty scan-projects <folder>` | Scan all projects in a folder (`--clean`, `--deep`, `--json`) |
 | `gitsafty full-scan <folder or file>` | Scan everything, including zip/rar files and non-git folders (`--clean`, `--json`) |

@@ -37,6 +37,42 @@ describe('Pull scan shell integration', () => {
     }
   });
 
+  it('is on by default, and stays off once the user turns it off', function () {
+    if (process.platform === 'win32') return this.skip();
+    const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'gitsafty-shell-default-'));
+    const saved = { HOME: process.env.HOME, SHELL: process.env.SHELL, CI: process.env.CI, GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL };
+    process.env.HOME = sandbox;
+    process.env.SHELL = '/bin/zsh';
+    process.env.GIT_CONFIG_GLOBAL = path.join(sandbox, '.gitconfig');
+    delete process.env.CI;
+    try {
+      const shell = require('../src/shellIntegration');
+      const rc = path.join(sandbox, '.zshrc');
+      fs.writeFileSync(rc, 'export FOO=1\n');
+
+      // Existing install without global GitSafty hooks: left alone
+      assert.deepStrictEqual(shell.enableByDefault({ onlyIfGlobalHooks: true }), []);
+      spawnSync('git', ['config', '--global', 'core.hooksPath', path.join(sandbox, '.git-hooks-safty')]);
+      assert.deepStrictEqual(shell.enableByDefault({ onlyIfGlobalHooks: true }), [rc], 'turned on by default');
+      assert.deepStrictEqual(shell.enableByDefault(), [], 'already on: nothing to do');
+
+      shell.removeShellIntegration({ optOut: true });
+      assert.ok(shell.isOptedOut());
+      assert.deepStrictEqual(shell.enableByDefault(), [], 'user turned it off: never re-added');
+      assert.ok(!fs.readFileSync(rc, 'utf8').includes(shell.START));
+
+      shell.installShellIntegration();
+      assert.ok(!shell.isOptedOut(), 'turning it on clears the opt-out');
+      shell.removeShellIntegration(); // uninstall (not an opt-out)
+      assert.deepStrictEqual(shell.enableByDefault(), [rc]);
+    } finally {
+      for (const [k, v] of Object.entries(saved)) {
+        if (v === undefined) delete process.env[k]; else process.env[k] = v;
+      }
+      fs.rmSync(sandbox, { recursive: true, force: true });
+    }
+  });
+
   it('generates a function that bash accepts and that keeps git\'s exit code', function () {
     if (process.platform === 'win32') return this.skip();
     const shell = require('../src/shellIntegration');

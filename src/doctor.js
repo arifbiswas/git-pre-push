@@ -224,8 +224,10 @@ function runChecks({ cwd = process.cwd(), cliPath } = {}) {
   try {
     const shell = require('./shellIntegration');
     const st = shell.shellIntegrationStatus();
-    if (!st.installed.length) {
-      checks.push({ id: 'pull-scan', ok: true, level: 'warn', title: 'Pulls that are "Already up to date" are not scanned (git runs no hook then)', commands: ['gitsafty pull-scan on'] });
+    if (!st.installed.length && st.optedOut) {
+      checks.push({ id: 'pull-scan', ok: true, level: 'ok', title: 'Pull scan for "Already up to date" pulls is off (you turned it off)', commands: ['gitsafty pull-scan on'] });
+    } else if (!st.installed.length) {
+      checks.push({ id: 'pull-scan', ok: true, level: 'warn', title: 'Pulls that are "Already up to date" are not scanned (on by default, but not set up here)', commands: ['gitsafty pull-scan on'], fix: () => shell.installShellIntegration() });
     } else {
       checks.push({ id: 'pull-scan', ok: true, level: 'ok', title: `Every git pull is scanned (${st.installed.join(', ')})`, fix: () => shell.installShellIntegration() });
     }

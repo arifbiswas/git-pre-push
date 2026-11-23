@@ -23,29 +23,24 @@ const args = process.argv.slice(2);
 const command = args[0] ? args[0].toLowerCase() : 'menu';
 const isGlobalFlag = args.includes('--global') || args.includes('-g');
 
-/** After a global install: offer the shell function that scans every git pull. */
-async function offerPullScan() {
+/** After a global install: pull scan is on by default (also "Already up to date" pulls). */
+function enablePullScan() {
   const shell = require('../src/shellIntegration');
   if (shell.shellIntegrationStatus().installed.length) {
     shell.installShellIntegration(); // refresh with this version's paths
+    console.log(`${colors.green}✔ Every git pull is scanned${colors.reset} ${colors.dim}(also "Already up to date"). Turn off: gitsafty pull-scan off${colors.reset}\n`);
     return;
   }
-  const interactive = process.stdin.isTTY && process.stdout.isTTY && !process.env.CI;
-  console.log(`${colors.dim}git runs no hook when a pull is "Already up to date". To scan after EVERY git pull,${colors.reset}`);
-  console.log(`${colors.dim}GitSafty can add a small git function to your shell profile (.zshrc / .bashrc / PowerShell profile).${colors.reset}`);
-  if (!interactive) {
-    console.log(`  Turn it on: ${colors.cyan}gitsafty pull-scan on${colors.reset}\n`);
+  if (shell.isOptedOut()) {
+    console.log(`${colors.dim}Pull scan for "Already up to date" pulls is off (you turned it off). Turn on: gitsafty pull-scan on${colors.reset}\n`);
     return;
   }
-  const readline = require('readline');
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const answer = await new Promise(r => rl.question(`${colors.bold}${colors.cyan}? Scan after every git pull? (Y/n): ${colors.reset}`, a => { rl.close(); r(a.trim()); }));
-  if (/^n(o)?$/i.test(answer)) {
-    console.log(`  ${colors.dim}Skipped. Turn it on later: gitsafty pull-scan on${colors.reset}\n`);
-    return;
+  const files = shell.enableByDefault();
+  if (files.length) {
+    console.log(`${colors.green}✔ Every git pull is scanned${colors.reset} ${colors.dim}(also "Already up to date"; added to ${files.join(', ')}).${colors.reset}`);
+    console.log(`  ${colors.dim}Load it now:${colors.reset} ${colors.cyan}${shell.reloadHint()}${colors.reset}`);
+    console.log(`  ${colors.dim}Turn off: gitsafty pull-scan off${colors.reset}\n`);
   }
-  const res = shell.installShellIntegration();
-  console.log(`${colors.green}✔ Pull scan on${colors.reset} ${colors.dim}(${res.files.join(', ')})${colors.reset}. Load it now: ${colors.cyan}${shell.reloadHint()}${colors.reset}\n`);
 }
 
 async function main() {
@@ -56,9 +51,18 @@ async function main() {
   if (command !== 'credential' && process.env.GITSAFTY_NO_SELF_REFRESH !== '1') {
     try {
       const refreshed = require('../src/installer').refreshOutdatedHooks();
-      const shells = require('../src/shellIntegration').refreshShellIntegration();
+      const shell = require('../src/shellIntegration');
+      const shells = shell.refreshShellIntegration();
       if ((refreshed.length || shells.length) && !hookCommands.includes(command)) {
         console.log(`${colors.green}✔ GitSafty ${pkg.version}: updated ${[...refreshed.map(t => `${t} hook`), ...shells.map(f => require('path').basename(f))].join(', ')} to this version.${colors.reset}`);
+      }
+      // Pull scan is on by default: existing global installs get it on update too
+      // (only from the real global copy, and never if the user turned it off).
+      if (require('../src/installer').isPermanentGlobalInstall()) {
+        const added = shell.enableByDefault({ onlyIfGlobalHooks: true });
+        if (added.length && !hookCommands.includes(command)) {
+          console.log(`${colors.green}✔ Every git pull is now scanned${colors.reset} ${colors.dim}(also "Already up to date"; ${added.map(f => require('path').basename(f)).join(', ')}). Open a new terminal. Turn off: gitsafty pull-scan off${colors.reset}`);
+        }
       }
     } catch (_) {}
   }
@@ -210,14 +214,14 @@ async function main() {
           console.log(`  Load it now: ${colors.cyan}${shell.reloadHint()}${colors.reset}\n`);
         }
       } else if (sub === 'off' || sub === 'remove' || sub === 'disable') {
-        const res = shell.removeShellIntegration();
-        console.log(`\n${colors.yellow}${colors.bold}✔ Pull scan shell function removed${res.files.length ? ` from ${res.files.join(', ')}` : ' (was not installed)'}.${colors.reset}`);
-        console.log(`  ${colors.dim}Open a new terminal to finish. Pulls that bring changes are still scanned by the git hooks.${colors.reset}\n`);
+        const res = shell.removeShellIntegration({ optOut: true });
+        console.log(`\n${colors.yellow}${colors.bold}✔ Pull scan turned off${res.files.length ? ` (removed from ${res.files.join(', ')})` : ''}. GitSafty will not turn it on again by itself.${colors.reset}`);
+        console.log(`  ${colors.dim}Open a new terminal to finish. Pulls that bring changes are still scanned by the git hooks. Turn on again: gitsafty pull-scan on${colors.reset}\n`);
       } else {
         const st = shell.shellIntegrationStatus();
         console.log(st.installed.length
           ? `\n${colors.green}✔ Pull scan is ON${colors.reset} ${colors.dim}(${st.installed.join(', ')})${colors.reset}\n`
-          : `\n${colors.yellow}Pull scan shell function is OFF.${colors.reset} Pulls that bring changes are still scanned by the git hooks.\n  Turn on scanning for every pull: ${colors.cyan}gitsafty pull-scan on${colors.reset}\n`);
+          : `\n${colors.yellow}Pull scan is OFF${st.optedOut ? ' (you turned it off)' : ''}.${colors.reset} Pulls that bring changes are still scanned by the git hooks.\n  Turn on scanning for every pull: ${colors.cyan}gitsafty pull-scan on${colors.reset}\n`);
       }
       break;
     }
@@ -340,6 +344,7 @@ async function main() {
         console.log(`\n${colors.green}${colors.bold}✔ ${result.message}${colors.reset}\n`);
         console.log(`${colors.cyan}Your git environment is now protected!${colors.reset}`);
         console.log(`${colors.dim}Every git push, clone and pull${isGlobalFlag ? ' on this PC' : ' in this repository'} is scanned for malware & secret leaks.${colors.reset}\n`);
+        if (isGlobalFlag) enablePullScan();
         const { offerPermanentInstall } = require('../src/updateNotifier');
         // npx copy: re-run the same init globally. Project copy: protect the whole PC.
         await offerPermanentInstall(['init', '--global']);
