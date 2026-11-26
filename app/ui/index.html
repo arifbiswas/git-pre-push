@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.github.com https://raw.githubusercontent.com">
+  <title>GitSafty</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="layout">
+    <nav class="nav" id="nav">
+      <div class="brand">GitSafty <span id="version" class="muted"></span></div>
+      <button data-page="protection" class="nav-item desktop-only">Protection</button>
+      <button data-page="scan" class="nav-item">Scan</button>
+      <button data-page="github" class="nav-item">GitHub repo</button>
+      <button data-page="fix" class="nav-item desktop-only">Fix problems</button>
+    </nav>
+
+    <main class="main">
+      <!-- Protection (desktop) -->
+      <section class="page" id="page-protection">
+        <h1>Protection</h1>
+        <p class="lead">GitSafty checks every git push, clone and pull on this computer, and removes confirmed malware.</p>
+        <div id="protection-status" class="cards"></div>
+        <p class="muted small" id="protection-note"></p>
+        <pre class="output" id="protection-output" hidden></pre>
+      </section>
+
+      <!-- Scan -->
+      <section class="page" id="page-scan">
+        <h1>Scan</h1>
+        <p class="lead" id="scan-lead">Check your projects and files for malware.</p>
+        <div class="choices" id="scan-choices">
+          <button class="choice desktop-only" data-mode="project">
+            <strong>Scan one project</strong>
+            <span>Malware, hidden backdoors and leaked keys in one project folder.</span>
+          </button>
+          <button class="choice desktop-only" data-mode="projects">
+            <strong>Scan all projects in a folder</strong>
+            <span>Every project inside a folder, one result per project.</span>
+          </button>
+          <button class="choice desktop-only" data-mode="everything">
+            <strong>Scan everything in a folder</strong>
+            <span>All files, also zip/rar files and folders that are not git projects.</span>
+          </button>
+          <button class="choice" data-mode="files">
+            <strong>Scan files</strong>
+            <span>Pick files, for example a zip or apk you downloaded.</span>
+          </button>
+        </div>
+        <div id="scan-progress" class="progress" hidden><div class="bar"></div><span></span></div>
+        <div id="scan-result"></div>
+      </section>
+
+      <!-- GitHub -->
+      <section class="page" id="page-github">
+        <h1>GitHub repo</h1>
+        <p class="lead">Check a GitHub project before you clone it. Nothing is downloaded to your device.</p>
+        <form id="github-form" class="form">
+          <input id="github-url" type="text" inputmode="url" autocomplete="off" placeholder="https://github.com/owner/repo" required>
+          <details>
+            <summary>Private repo or many scans? Add a token</summary>
+            <input id="github-token" type="password" autocomplete="off" placeholder="GitHub token (optional, not saved)">
+          </details>
+          <button type="submit" class="primary">Scan repo</button>
+        </form>
+        <div id="github-progress" class="progress" hidden><div class="bar"></div><span></span></div>
+        <div id="github-result"></div>
+      </section>
+
+      <!-- Fix problems (desktop) -->
+      <section class="page" id="page-fix">
+        <h1>Fix problems</h1>
+        <p class="lead">Finds what is broken in your GitSafty setup and shows how to fix it.</p>
+        <div class="row">
+          <button class="primary" id="doctor-run">Check now</button>
+          <button id="doctor-fix">Apply safe fixes</button>
+        </div>
+        <pre class="output" id="doctor-output" hidden></pre>
+        <h2>Safe GitHub login</h2>
+        <p class="muted">Keeps this computer logged out of GitHub; every push asks for Touch ID, Windows Hello or a password. Set it up in a terminal:</p>
+        <pre class="output">gitsafty vault setup</pre>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

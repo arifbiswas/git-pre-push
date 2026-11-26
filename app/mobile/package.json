@@ -1,0 +1,22 @@
+{
+  "name": "gitsafty-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GitSafty Android app: scan GitHub repos and files on your phone.",
+  "license": "MIT",
+  "scripts": {
+    "build": "node build.js",
+    "android": "node build.js && npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "6.2.0",
+    "@capacitor/core": "6.2.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "6.2.0",
+    "buffer": "6.0.3",
+    "esbuild": "0.24.0",
+    "pako": "2.1.0",
+    "path-browserify": "1.0.1"
+  }
+}

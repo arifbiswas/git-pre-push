@@ -79,12 +79,18 @@ async function main() {
   }
 
   // `gitsafty update` does its own check below.
-  if (!hookCommands.includes(command) && command !== 'update' && command !== 'upgrade') {
+  if (!hookCommands.includes(command) && !['update', 'upgrade', 'version', '--version', '-v'].includes(command)) {
     // Opening the menu always asks the registry, so a fresh release is never missed.
     await notifyIfUpdateAvailable(pkg.version, { force: command === 'menu' || command === 'interactive' });
   }
 
   switch (command) {
+    case 'version':
+    case '--version':
+    case '-v':
+      console.log(pkg.version);
+      break;
+
     case 'update':
     case 'upgrade':
       banner();

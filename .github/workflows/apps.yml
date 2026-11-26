@@ -1,0 +1,121 @@
+name: Build Apps (desktop + Android)
+
+# Runs after every npm release (and by hand), builds the desktop installers
+# and the Android APK, and attaches them to the GitHub Release vX.Y.Z.
+on:
+  workflow_run:
+    workflows: ["Auto Version Bump & NPM Publish"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apps-release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - id: v
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+  desktop:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install
+        working-directory: app/desktop
+        run: npm ci
+      - name: Build installers
+        working-directory: app/desktop
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: |
+            app/desktop/dist/*.dmg
+            app/desktop/dist/*.exe
+            app/desktop/dist/*.AppImage
+            app/desktop/dist/*.deb
+          if-no-files-found: error
+
+  android:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build web app
+        working-directory: app/mobile
+        run: |
+          npm ci
+          node build.js
+      - name: Create Android project
+        working-directory: app/mobile
+        run: |
+          npx cap add android
+          VERSION="${{ needs.version.outputs.version }}"
+          CODE=$(echo "$VERSION" | awk -F. '{ print $1 * 10000 + $2 * 100 + $3 }')
+          sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION\"/; s/versionCode [0-9]*/versionCode $CODE/" android/app/build.gradle
+          node scripts/android-icon.js
+          npx cap sync android
+      - name: Build APK
+        working-directory: app/mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Rename APK
+        run: |
+          mkdir -p out
+          cp app/mobile/android/app/build/outputs/apk/debug/app-debug.apk "out/GitSafty-${{ needs.version.outputs.version }}-android.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: out/*.apk
+          if-no-files-found: error
+
+  release:
+    needs: [version, desktop, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Attach to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: v${{ needs.version.outputs.version }}
+        run: |
+          ls -la assets
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "GitSafty $TAG" --notes "Desktop apps for macOS (.dmg), Windows (.exe) and Linux (.AppImage / .deb), and the Android app (.apk). The command-line tool: npm install -g @arifbiswas/git-pre-push"
+          fi
+          gh release upload "$TAG" assets/* --repo "$GITHUB_REPOSITORY" --clobber

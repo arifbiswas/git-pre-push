@@ -5,3 +5,14 @@ dist/
 coverage/
 .cache/
 
+
+# App builds (generated from src/ and app/ui by the build scripts)
+app/desktop/engine/
+app/desktop/ui/
+app/desktop/smoke-out/
+app/mobile/www/
+app/mobile/android/
+
+# Local AI tooling
+.claude/
+CLAUDE.md

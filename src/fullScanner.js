@@ -22,9 +22,8 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { detectMalware, sha256, CONFIRMED } = require('./rules/malware');
-const { checkFilename } = require('./rules/filenames');
-const { inspectIdeConfig } = require('./rules/ideConfig');
+const { sha256, CONFIRMED } = require('./rules/malware');
+const { inspectContent } = require('./inspect');
 const { gitPersistenceFindings } = require('./advancedScanner');
 const { removeConfirmedMalware, notifyDesktop } = require('./malwareCleaner');
 const { walkArchive, detectArchiveType } = require('./archive');
@@ -47,9 +46,6 @@ const PACKAGE_FILES = new Set([
   'composer.lock', 'Gemfile.lock', 'Podfile.lock', 'Cargo.lock', 'poetry.lock', 'Pipfile.lock',
   'pubspec.lock', 'go.sum', 'packages.lock.json', 'gradle.lockfile', 'mix.lock', 'flake.lock'
 ]);
-// document.pdf.exe style names, and Windows script/screensaver types that are almost only used by malware.
-const DECEPTIVE_NAME = /\.(pdf|docx?|xlsx?|pptx?|txt|jpe?g|png|gif|mp4|mp3|zip|rar)\.(exe|scr|com|bat|cmd|vbs|js|jse|ps1|hta|lnk)$|\.(scr|pif|cpl|hta|vbe|jse|wsf)$/i;
-const KNOWN_GOOD_SCRIPTS = new Set(['gradlew.bat', 'mvnw.cmd', 'gradlew', 'mvnw']);
 
 const MAX_FILE = 32 * 1024 * 1024;
 const MAX_ARCHIVE = 1024 * 1024 * 1024;
@@ -79,25 +75,6 @@ function readHead(full, n = 512) {
   } finally {
     if (fd !== undefined) try { fs.closeSync(fd); } catch (_) {}
   }
-}
-
-/** Findings for one piece of content (loose file or archive entry). */
-function inspectContent(displayPath, innerPath, buf, { names = true } = {}) {
-  const out = [];
-  for (const f of detectMalware(innerPath, buf)) out.push({ category: 'malware', ...f, filePath: displayPath });
-  const base = innerPath.split('/').pop();
-  // Only names that are almost never legitimate: plain .exe/.dll/.bin are normal in downloads and app bundles.
-  const nameRule = names && !KNOWN_GOOD_SCRIPTS.has(base) ? checkFilename(innerPath) : null;
-  if (nameRule && (DECEPTIVE_NAME.test(base) || /^Known malicious/.test(nameRule.rule))) {
-    out.push({ category: 'file', verdict: 'SUSPECT', severity: 'CRITICAL', name: nameRule.rule, description: 'Disguised or known-malicious file name.', filePath: displayPath });
-  }
-  const norm = innerPath.replace(/\\/g, '/');
-  if (/(^|\/)\.vscode\/(tasks|settings)\.json$/.test(norm) || /(^|\/)\.idea\/workspace\.xml$/.test(norm)) {
-    for (const f of inspectIdeConfig(innerPath, buf.toString('utf8'))) {
-      out.push({ category: 'ide', verdict: 'SUSPECT', ...f, filePath: displayPath });
-    }
-  }
-  return out;
 }
 
 /**
@@ -144,7 +121,7 @@ function fullScan(root, { onProgress } = {}) {
   };
 
   const scanFile = (full) => {
-    const rel = path.relative(abs, full).replace(/\\/g, '/');
+    const rel = path.relative(result.root, full).replace(/\\/g, '/');
     let st;
     try { st = fs.statSync(full); } catch (_) { result.unreadable++; return; }
     if (!st.size) return;
@@ -191,7 +168,13 @@ function fullScan(root, { onProgress } = {}) {
   };
 
   const st = fs.statSync(abs);
-  if (st.isFile()) scanFile(abs); else walk(abs);
+  if (st.isFile()) {
+    // A single file: paths are shown (and removed) relative to its folder.
+    result.root = path.dirname(abs);
+    scanFile(abs);
+  } else {
+    walk(abs);
+  }
   return result;
 }
 
@@ -365,6 +348,7 @@ function runFullScan(target, { clean = false, json = false } = {}) {
 module.exports = {
   fullScan,
   runFullScan,
+  annotate,
   removeFullScanMalware,
   DEPENDENCY_DIRS,
   PACKAGE_FILES

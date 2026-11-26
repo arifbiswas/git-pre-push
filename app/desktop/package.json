@@ -1,0 +1,85 @@
+{
+  "name": "gitsafty-desktop",
+  "productName": "GitSafty",
+  "version": "1.0.0",
+  "description": "GitSafty desktop app: protect your git projects and scan for malware.",
+  "main": "main.js",
+  "author": "Arif Biswas",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "prepare-engine": "node scripts/prepare.js",
+    "start": "npm run prepare-engine && electron .",
+    "dist": "node scripts/dist.js"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.arifbiswas.gitsafty",
+    "productName": "GitSafty",
+    "artifactName": "GitSafty-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "worker.js",
+      "engine/**",
+      "ui/**",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "identity": null
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Development",
+      "maintainer": "Arif Biswas"
+    },
+    "asarUnpack": [
+      "worker.js",
+      "engine/**"
+    ]
+  }
+}
