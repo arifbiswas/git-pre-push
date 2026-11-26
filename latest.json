@@ -1,0 +1,14 @@
+{
+  "sequence": 1795665676,
+  "generatedAt": "2026-11-26T04:01:16.700Z",
+  "sources": {
+    "osv-npm": {
+      "packages": 224090,
+      "entries": 224091
+    },
+    "osv-PyPI": {
+      "packages": 12075,
+      "entries": 12075
+    }
+  }
+}
