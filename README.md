@@ -254,6 +254,40 @@ If a `.env` was pushed **before** you used GitSafty, it is removed from GitHub w
 
 ---
 
+## Learns new malware every day
+
+Every day a GitHub Action collects newly reported malicious packages from public malware databases. It uses the OpenSSF malicious packages list (via OSV) for npm and PyPI. It also adds malware file fingerprints and patterns added by the GitSafty maintainers. Everything is published as one signed update.
+
+GitSafty downloads the update by itself in the background. It checks at most every 12 hours. This works in the CLI, the desktop app and the Android app. You do not need to update npm, and nobody has to send examples.
+
+The update is digitally signed (Ed25519). GitSafty only accepts it when the signature matches the key built into GitSafty. It never goes back to an older update. So nobody can push fake patterns.
+
+What it catches:
+
+- A known malicious npm or PyPI package in `package.json`, `package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml` or `requirements*.txt`. This includes deep (transitive) dependencies.
+- For packages where only some versions were hijacked, only those exact versions are flagged. For example, chalk 5.6.1 and debug 4.4.2 in September 2025.
+- Known malware files (found by fingerprint) are removed automatically, like other confirmed malware.
+- Malicious packages are reported and block the push. The report shows the command to remove them, for example `npm uninstall <name>`. GitSafty does not edit your dependencies itself.
+- Patterns from the maintainers are reported. They are never removed automatically.
+
+See what is installed and from when:
+
+```bash
+gitsafty signatures
+```
+
+Update now:
+
+```bash
+gitsafty signatures update
+```
+
+Turn off the background download with the environment variable `GITSAFTY_NO_FEED_UPDATE=1`.
+
+The signatures are stored in `~/.gitsafty/signatures/`.
+
+---
+
 ## Safe GitHub login
 
 Malware on a computer usually steals saved logins. With safe login on, there is no saved GitHub login to steal.
@@ -365,6 +399,8 @@ git config --global --remove-section credential.https://github.com
 | `gitsafty action` | Add the check to GitHub Actions |
 | `gitsafty doctor` | Find and fix problems (`--fix`) |
 | `gitsafty demo` | Show a blocked push |
+| `gitsafty signatures` | Show the learned malware signatures |
+| `gitsafty signatures update` | Download the newest signatures now |
 
 Using `npx` instead of a global install? Put `npx @arifbiswas/git-pre-push` in place of `gitsafty`.
 

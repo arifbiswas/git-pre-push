@@ -3,6 +3,7 @@
   "productName": "GitSafty",
   "version": "1.0.0",
   "description": "GitSafty desktop app: protect your git projects and scan for malware.",
+  "homepage": "https://github.com/arifbiswas/git-pre-push",
   "main": "main.js",
   "author": "Arif Biswas",
   "license": "MIT",
@@ -75,7 +76,7 @@
         }
       ],
       "category": "Development",
-      "maintainer": "Arif Biswas"
+      "maintainer": "Arif Biswas <arifbiswas@users.noreply.github.com>"
     },
     "asarUnpack": [
       "worker.js",

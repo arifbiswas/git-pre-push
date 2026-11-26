@@ -210,6 +210,7 @@
   // ---------------------------------------------------------------- start
   api.info().then((info) => {
     $('#version').textContent = info.version ? `v${info.version}` : '';
+    $('#version').title = info.signatures ? `Learned signatures from ${String(info.signatures).slice(0, 10)}` : 'Learned signatures not downloaded yet';
     if (info.platform !== 'desktop') {
       document.body.classList.add('mobile');
       $('#scan-lead').textContent = 'Check files on this phone, for example a zip or apk you downloaded.';

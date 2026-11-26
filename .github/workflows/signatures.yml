@@ -1,0 +1,55 @@
+name: Update Malware Signatures
+
+# Builds the signed signature feed every day from public malware databases
+# (OpenSSF / OSV malicious npm and PyPI packages) plus signatures/rules.json,
+# and publishes it on the `signatures` branch. Every GitSafty downloads it by
+# itself and only accepts it when the Ed25519 signature matches.
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'signatures/rules.json'
+      - 'tools/build-signatures.js'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: signatures
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build and sign the feed
+        env:
+          SIGNATURES_PRIVATE_KEY: ${{ secrets.SIGNATURES_PRIVATE_KEY }}
+        run: node tools/build-signatures.js out
+      - name: Check the signature with the key built into GitSafty
+        run: |
+          node -e "
+            const fs = require('fs');
+            const feed = require('./src/signatures').parseFeed(fs.readFileSync('out/feed.json.gz'), fs.readFileSync('out/feed.json.gz.sig', 'utf8'));
+            console.log('OK, sequence', feed.sequence);
+          "
+      - name: Publish to the signatures branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd out
+          git init -q -b signatures
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Signatures $(date -u +%Y-%m-%d) [skip ci]"
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" signatures

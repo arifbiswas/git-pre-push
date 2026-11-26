@@ -41,8 +41,9 @@ const DEPENDENCY_DIRS = new Set([
   '.gitsafty', 'gitsafty-quarantine', '.Trash', '$RECYCLE.BIN'
 ]);
 // Package manager files: lock files and manifests of dependencies, not code that runs.
+// npm lock files are NOT skipped: the signature feed checks them for known malicious packages.
 const PACKAGE_FILES = new Set([
-  'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'npm-shrinkwrap.json',
+  'bun.lockb',
   'composer.lock', 'Gemfile.lock', 'Podfile.lock', 'Cargo.lock', 'poetry.lock', 'Pipfile.lock',
   'pubspec.lock', 'go.sum', 'packages.lock.json', 'gradle.lockfile', 'mix.lock', 'flake.lock'
 ]);

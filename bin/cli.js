@@ -44,6 +44,14 @@ function enablePullScan() {
 }
 
 async function main() {
+  // Learned malware patterns: use the installed signed feed in every scan, and
+  // fetch a newer one in the background (never blocks git).
+  try {
+    const signatures = require('../src/signatures');
+    signatures.register();
+    if (command !== 'signatures' && command !== 'credential') signatures.updateInBackground(__filename);
+  } catch (_) {}
+
   // Check for updates non-blocking on interactive commands
   const hookCommands = ['scan-push', 'scan-checkout', 'scan-merge', 'scan-rewrite', 'scan-pull', 'credential'];
   // Keep the global hooks and the pull-scan shell function in step with this
@@ -79,12 +87,39 @@ async function main() {
   }
 
   // `gitsafty update` does its own check below.
-  if (!hookCommands.includes(command) && !['update', 'upgrade', 'version', '--version', '-v'].includes(command)) {
+  if (!hookCommands.includes(command) && !['update', 'upgrade', 'version', '--version', '-v', 'signatures', 'signature', 'update-signatures'].includes(command)) {
     // Opening the menu always asks the registry, so a fresh release is never missed.
     await notifyIfUpdateAvailable(pkg.version, { force: command === 'menu' || command === 'interactive' });
   }
 
   switch (command) {
+    case 'signatures':
+    case 'signature':
+    case 'update-signatures': {
+      const signatures = require('../src/signatures');
+      const quiet = args.includes('--quiet');
+      const sub = (args[1] && !args[1].startsWith('-') ? args[1] : (command === 'update-signatures' ? 'update' : 'status')).toLowerCase();
+      if (sub === 'update') {
+        try {
+          const r = await signatures.update();
+          if (!quiet) console.log(`${colors.green}✔ Signatures ${r.updated ? 'updated' : 'already up to date'}${colors.reset} ${colors.dim}(${String(r.generatedAt).slice(0, 10)}: ${r.counts.npm} npm + ${r.counts.pypi} PyPI malicious packages, ${r.counts.hashes} hashes, ${r.counts.markers} patterns)${colors.reset}`);
+        } catch (err) {
+          if (!quiet) console.error(`${colors.yellow}⚠ Could not update signatures: ${err.message}${colors.reset}\n  ${colors.dim}Scans keep using the installed signatures. Try again later: gitsafty signatures update${colors.reset}`);
+          process.exitCode = quiet ? 0 : 1;
+        }
+      } else {
+        const st = signatures.status();
+        if (st.installed) {
+          console.log(`${colors.green}✔ Learned signatures installed${colors.reset} ${colors.dim}(${String(st.generatedAt).slice(0, 10)})${colors.reset}`);
+          console.log(`  ${st.counts.npm} npm + ${st.counts.pypi} PyPI malicious packages, ${st.counts.hashes} malware hashes, ${st.counts.markers} patterns`);
+          console.log(`  ${colors.dim}Updated automatically every 12 hours. Update now: gitsafty signatures update${colors.reset}`);
+        } else {
+          console.log(`${colors.yellow}No learned signatures yet.${colors.reset} Get them now: ${colors.cyan}gitsafty signatures update${colors.reset}`);
+        }
+      }
+      break;
+    }
+
     case 'version':
     case '--version':
     case '-v':
@@ -403,6 +438,7 @@ ${colors.bold}Commands:${colors.reset}
   ${colors.green}vault test${colors.reset}   Try one unlock (prompt) without using the token
   ${colors.green}vault remove${colors.reset} Turn the vault off and go back to normal git login
   ${colors.green}scan-projects${colors.reset} <folder>  Advanced Scanner: audit EVERY project in a folder at once
+  ${colors.green}signatures${colors.reset} [update]  Learned malware patterns (malicious npm/PyPI packages, hashes), updated daily
   ${colors.green}full-scan${colors.reset} <folder>  Full Scan: EVERYTHING in a folder, also non-git projects and inside zip/jar/apk/tar/gz/7z/rar (--clean removes)
                (malware, git backdoors, IDE auto-run, secrets) [--clean] [--deep] [--json]
   ${colors.green}pull-scan${colors.reset} on|off  Scan after EVERY git pull, also "Already up to date" (adds a git shell function)
