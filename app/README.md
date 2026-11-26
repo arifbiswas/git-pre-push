@@ -119,6 +119,28 @@ Open it in a browser at phone width.
 
 It uploads them to the GitHub Release `vX.Y.Z`. The builds are unsigned.
 
+## Learned signatures
+
+- `src/signatures.js` downloads `feed.json.gz` and `feed.json.gz.sig` from the `signatures` branch (raw.githubusercontent.com). It verifies the Ed25519 signature with the public key in the file and refuses older sequence numbers. The files are stored in `~/.gitsafty/signatures/`.
+- `src/rules/feedRules.js` holds the detections. It is pure code, so it also runs on Android.
+- The desktop worker calls `register()`. The desktop main process calls `update()` at start.
+- The Android app verifies the signature with WebCrypto Ed25519 in `mobile-api.js`.
+- `.github/workflows/signatures.yml` runs daily at 02:30 UTC. It also runs when `signatures/rules.json` or `tools/build-signatures.js` changes, or by hand. It runs `tools/build-signatures.js` with the secret `SIGNATURES_PRIVATE_KEY`, checks the result with the built-in public key, and force-pushes a single commit to the `signatures` branch.
+
+To add a maintainer rule, edit `signatures/rules.json` and merge to main:
+
+- `hashes`: sha256 mapped to a description. Removed automatically.
+- `markers`: `{ id, name, pattern, flags, files, verdict, description }`. Reported only.
+
+Key rotation:
+
+1. Generate a new Ed25519 key.
+2. Put the private PEM into the `SIGNATURES_PRIVATE_KEY` secret.
+3. Put the public key (SPKI DER, base64) into `PUBLIC_KEY` in `src/signatures.js`.
+4. Release a new version.
+
+Old clients keep the old feed until they update.
+
 ## Known limits
 
 Keep this list. It is for the next developer.
@@ -128,3 +150,5 @@ Keep this list. It is for the next developer.
 - Android cannot open 7z or rar files.
 - The Android APK is debug-signed.
 - There is no iOS app.
+- No similarity matching of new variants yet. Only exact package names and versions, exact file hashes and maintainer patterns are matched.
+- Android needs a WebView with Ed25519 support. Otherwise it uses the built-in rules only.

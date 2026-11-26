@@ -6,6 +6,8 @@ const { parentPort, workerData } = require('worker_threads');
 const path = require('path');
 
 const engine = (p) => require(path.join(__dirname, 'engine', p));
+// Use the learned (signed) signatures in every scan.
+engine('src/signatures').register();
 const progress = (done, total, label) => parentPort.postMessage({ type: 'progress', done, total, label });
 
 async function run({ job, args }) {

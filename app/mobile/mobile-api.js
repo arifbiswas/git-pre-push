@@ -8,6 +8,32 @@ const { walkArchive, detectArchiveType } = require('../../src/archive');
 const { scanGitHubRepo } = require('../../src/remoteDeepScan');
 const { fromFullScan, fromGitHub } = require('../engine/normalize');
 const { version } = require('../../package.json');
+const feedRules = require('../../src/rules/feedRules');
+const { FEED_URL, PUBLIC_KEY } = require('../../src/signatures');
+const pako = require('pako');
+
+/**
+ * Learned signatures: download the signed feed and use it only when the
+ * Ed25519 signature matches the key built into GitSafty. Phones whose
+ * browser engine has no Ed25519 keep using the built-in rules.
+ */
+let feedInfo = null;
+const fromB64 = (s) => Uint8Array.from(atob(String(s).trim()), c => c.charCodeAt(0));
+async function loadFeed() {
+  try {
+    const [gz, sig] = await Promise.all([
+      fetch(FEED_URL, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }),
+      fetch(`${FEED_URL}.sig`, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+    ]);
+    const key = await crypto.subtle.importKey('spki', fromB64(PUBLIC_KEY), { name: 'Ed25519' }, false, ['verify']);
+    if (!(await crypto.subtle.verify({ name: 'Ed25519' }, key, fromB64(sig), gz))) return;
+    const feed = JSON.parse(new TextDecoder().decode(pako.ungzip(new Uint8Array(gz))));
+    if (feed.schema !== 1) return;
+    feedRules.setFeed(feed);
+    feedInfo = feed.generatedAt;
+  } catch (_) { /* offline or no Ed25519: built-in rules only */ }
+}
+const feedReady = loadFeed();
 
 const DEPENDENCY = /(^|\/)(node_modules|vendor|bower_components|Pods|\.yarn|\.gradle)\//;
 const MAX_FILE = 256 * 1024 * 1024;
@@ -50,11 +76,12 @@ async function scanFile(file) {
 const wait = () => new Promise(r => setTimeout(r, 0));
 
 window.gitsafty = {
-  info: async () => ({ platform: 'android', version }),
+  info: async () => { await Promise.race([feedReady, new Promise(r => setTimeout(r, 4000))]); return { platform: 'android', version, signatures: feedInfo }; },
   pickFiles,
   pickFolder: async () => null,
   async scan(mode, files, onProgress) {
     if (mode !== 'files') throw new Error('Only file scans are available on a phone.');
+    await feedReady;
     const results = [];
     for (let i = 0; i < files.length; i++) {
       if (onProgress) onProgress(i, files.length, `Checking ${files[i].name}`);

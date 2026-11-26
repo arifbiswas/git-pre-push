@@ -74,6 +74,8 @@ function zipEntries(buf) {
   let cdSize = buf.readUInt32LE(eocd + 12);
   let cdOffset = buf.readUInt32LE(eocd + 16);
 
+  // The central directory ends where the (zip64) end record starts.
+  let cdEnd = eocd;
   // zip64
   if (eocd >= 20 && buf.readUInt32LE(eocd - 20) === 0x07064b50) {
     const z64 = Number(buf.readBigUInt64LE(eocd - 20 + 8));
@@ -81,10 +83,11 @@ function zipEntries(buf) {
       count = Number(buf.readBigUInt64LE(z64 + 32));
       cdSize = Number(buf.readBigUInt64LE(z64 + 40));
       cdOffset = Number(buf.readBigUInt64LE(z64 + 48));
+      cdEnd = z64;
     }
   }
-  // Self-extracting / prefixed zips (e.g. crx): the central directory sits right before the EOCD.
-  const shift = eocd - cdSize - cdOffset > 0 ? eocd - cdSize - cdOffset : 0;
+  // Self-extracting / prefixed zips (e.g. crx): the central directory sits right before the end record.
+  const shift = cdEnd - cdSize - cdOffset > 0 ? cdEnd - cdSize - cdOffset : 0;
 
   const entries = [];
   let p = cdOffset + shift;
@@ -348,5 +351,6 @@ module.exports = {
   isArchiveName,
   walkArchive,
   zipEntries,
+  zipEntryData,
   externalTool
 };

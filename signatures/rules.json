@@ -1,0 +1,5 @@
+{
+  "_comment": "Maintainer rules added to the daily signed feed. hashes: { sha256: description } of known malware files (removed automatically). markers: text patterns { id, name, pattern, flags, files, verdict (CONFIRMED | SUSPECT), description } (reported, never removed automatically).",
+  "hashes": {},
+  "markers": []
+}

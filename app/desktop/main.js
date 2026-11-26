@@ -115,6 +115,8 @@ function createWindow() {
 app.whenReady().then(() => {
   loadShellPath();
   createWindow();
+  // Fetch newer learned signatures (signed, checked) in the background.
+  engine('src/signatures').update().catch(() => {});
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
@@ -150,7 +152,10 @@ function runWorker(job, args, sender, progressId) {
   });
 }
 
-ipcMain.handle('info', () => ({ platform: 'desktop', version: ENGINE_VERSION, os: process.platform }));
+ipcMain.handle('info', () => {
+  const st = engine('src/signatures').status();
+  return { platform: 'desktop', version: ENGINE_VERSION, os: process.platform, signatures: st.installed ? st.generatedAt : null };
+});
 
 ipcMain.handle('pick-folder', async () => {
   const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'] });
