@@ -439,6 +439,8 @@ function runAdvancedScan(root, { clean = false, deep = false, json = false } = {
 module.exports = {
   runAdvancedScan,
   scanProject,
+  annotateActions,
+  statusOf,
   findProjects,
   gitPersistenceFindings
 };

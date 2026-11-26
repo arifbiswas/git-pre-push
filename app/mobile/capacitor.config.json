@@ -1,0 +1,6 @@
+{
+  "appId": "com.arifbiswas.gitsafty",
+  "appName": "GitSafty",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}

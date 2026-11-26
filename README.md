@@ -47,6 +47,72 @@ gitsafty init
 
 ---
 
+## Apps (desktop and Android)
+
+Prefer a window to the terminal? GitSafty also has a desktop app and an Android app.
+
+Download the latest version from the [GitHub Releases page](https://github.com/arifbiswas/git-pre-push/releases). Pick the file for your system:
+
+| System | File |
+|---|---|
+| macOS, Apple Silicon | `GitSafty-<version>-mac-arm64.dmg` |
+| macOS, Intel | `GitSafty-<version>-mac-x64.dmg` |
+| Windows | `GitSafty-<version>-win-x64.exe` |
+| Linux | the `.AppImage` file (any distro) or the `.deb` file (Ubuntu, Debian) |
+| Android | `GitSafty-<version>-android.apk` |
+
+There is no iOS app.
+
+### Desktop app
+
+The app has four pages:
+
+- **Protection**: turn protection for all projects on or off. Turn "scan every git pull" on or off. See if your GitHub login is safe.
+- **Scan**: scan one project, all projects in a folder, everything in a folder (including zip and rar files), or files you pick. Press **Remove confirmed malware** to remove what GitSafty is sure about. Backups are kept.
+- **GitHub repo**: check a repo by its link before you clone it. Nothing is downloaded to your disk.
+- **Fix problems**: runs the doctor.
+
+Safe GitHub login is still set up in a terminal:
+
+```bash
+gitsafty vault setup
+```
+
+Protection uses the `gitsafty` command. If it is missing, the app installs it with npm. So protection needs Node.js 18 or newer. Scanning works without Node.js.
+
+### Android app
+
+- Scan files on your phone, for example a zip or apk you downloaded.
+- Scan a GitHub repo by its link.
+
+Phones cannot run git hooks. So the Android app has no push, clone or pull protection.
+
+- 7z and rar files cannot be opened on a phone.
+- The app does not delete malware on the phone. Delete the file yourself with the Files app.
+
+### First start warnings
+
+The apps are not signed with a paid certificate. Your system shows a warning the first time you open them.
+
+- **macOS**: "GitSafty can't be opened because it is from an unidentified developer." Right-click the app, then choose **Open**. Or go to **System Settings > Privacy & Security** and click **Open Anyway**. If macOS says the app "is damaged", run this in Terminal:
+
+```bash
+xattr -cr /Applications/GitSafty.app
+```
+
+- **Windows**: SmartScreen shows "Windows protected your PC". Click **More info**, then **Run anyway**.
+- **Linux AppImage**: make the file runnable first, then run it:
+
+```bash
+chmod +x GitSafty-*.AppImage
+```
+
+- **Android**: when asked, allow "Install unknown apps" for your browser or Files app.
+
+The apps are built automatically by GitHub Actions for every new version. To build them yourself, see `app/README.md`.
+
+---
+
 ## The menu
 
 Run `gitsafty` with nothing after it:
